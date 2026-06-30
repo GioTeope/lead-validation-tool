@@ -135,6 +135,58 @@ function isInReferenceList(value, fieldLabel, list) {
 }
 
 /**
+ * Builds the expected real-world format for a language value:
+ *  - English (any variant: en, en-GB, en-US) always slugs to just
+ *    "english", e.g. "english-default (en-us)"
+ *  - Base/single-region languages (code has no hyphen, e.g. "fr", "es")
+ *    use "{slug}-default ({code})", e.g. "french-default (fr)"
+ *  - Regional/script variants (code has a hyphen, e.g. "fr-CA", "zh-Hans")
+ *    drop "-default" and slug the full name instead, e.g.
+ *    "french-canadian (fr-ca)", "chinese-simplified (zh-hans)",
+ *    "portuguese-brazil (pt-br)"
+ */
+function buildLanguageDefaultForm(item) {
+  const baseName = item.name.split(' - ')[0];
+  const isEnglish = baseName.toLowerCase() === 'english';
+  const isRegionalCode = item.code.includes('-');
+
+  if (isEnglish) {
+    return `english-default (${item.code.toLowerCase()})`;
+  }
+  if (isRegionalCode) {
+    const slug = item.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return `${slug} (${item.code.toLowerCase()})`;
+  }
+  const slug = baseName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return `${slug}-default (${item.code.toLowerCase()})`;
+}
+
+/**
+ * Validates the Language column against the "{slug}-default (code)" format
+ * (e.g. "english-default (en-us)", "french-canadian-default (fr-ca)"),
+ * while still accepting the plain name or code as a fallback.
+ */
+function isValidLanguage(value) {
+  if (!value || value.toString().trim() === '') {
+    return { ok: false, msg: 'Language should not be blank' };
+  }
+  const sRaw = value.toString().trim().toLowerCase();
+  const sNorm = normalizeForMatch(value);
+
+  const match = REFERENCE_DATA.LANGUAGES.some(item => {
+    if (buildLanguageDefaultForm(item).toLowerCase() === sRaw) return true;
+    if (normalizeForMatch(item.name) === sNorm) return true;
+    if (item.code.toLowerCase() === sRaw) return true;
+    return false;
+  });
+
+  if (!match) {
+    return { ok: false, msg: 'Language must be a valid value from the dropdown list (e.g. "english-default (en-us)")' };
+  }
+  return { ok: true };
+}
+
+/**
  * Validates a 2D array of spreadsheet data (first row = headers).
  * Returns { checked, errors } where errors is a flat list of issues.
  */
@@ -176,7 +228,7 @@ function validateLeadData(data) {
     if (colIdx.lastName > -1) pushIfBad(isValidName(row[colIdx.lastName], 'Last name'), 'Last Name', row[colIdx.lastName], 'name');
     if (colIdx.jobTitle > -1) pushIfBad(isValidJobTitle(row[colIdx.jobTitle]), 'Job Title', row[colIdx.jobTitle], 'jobtitle');
     if (colIdx.country > -1) pushIfBad(isInReferenceList(row[colIdx.country], 'Country', REFERENCE_DATA.COUNTRIES), 'Country', row[colIdx.country], 'other');
-    if (colIdx.language > -1) pushIfBad(isInReferenceList(row[colIdx.language], 'Language', REFERENCE_DATA.LANGUAGES), 'Language', row[colIdx.language], 'other');
+    if (colIdx.language > -1) pushIfBad(isValidLanguage(row[colIdx.language]), 'Language', row[colIdx.language], 'other');
   });
 
   return { checked, errors, emptyFile: false };

@@ -143,6 +143,11 @@ const BAD_JOB_TITLE_KEYWORDS = [
   'student'
 ];
 
+// Name of the sheet in MaSH lead upload files that should be validated.
+// These files arrive with 2 sheets (e.g. "List Template" + "E164 Phone
+// Format") — only the lead data sheet should be checked.
+const TARGET_SHEET_NAME = 'List Template';
+
 // Column header aliases — lets the tool find columns even if naming varies slightly
 const COLUMN_ALIASES = {
   email: ['Email Address', 'Email', 'EmailAddress'],
@@ -163,5 +168,6 @@ window.RULES = {
   SYMBOL_ONLY_PATTERN,
   BAD_JOB_TITLES,
   BAD_JOB_TITLE_KEYWORDS,
+  TARGET_SHEET_NAME,
   COLUMN_ALIASES
 };

@@ -32,7 +32,9 @@ This document explains every validation rule in plain language, for non-technica
 
 ### Language
 - Cannot be blank.
-- Must match a value (full name or language code) from the official language list — see `src/country-language-data.js`.
+- Must match the real-world value format used in our system: `{language}-default (code)` for base/single-region languages — e.g. `english-default (en-us)`, `french-default (fr)`, `spanish-default (es)`.
+- For regional or script variants, the format drops "-default" and uses the full language-region name instead — e.g. `chinese-simplified (zh-hans)`, `french-canadian (fr-ca)`, `portuguese-brazil (pt-br)`.
+- Plain language names (e.g. "English") or codes (e.g. "en-US") are also accepted as a fallback.
 
 ## Open Items — Fields Awaiting Full Dropdown Lists
 

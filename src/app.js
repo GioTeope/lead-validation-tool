@@ -21,13 +21,23 @@ function resetTool() {
   document.getElementById('dropZone').style.display = '';
 }
 
-function renderResults({ checked, errors }) {
+function renderResults({ checked, errors, sheetName, sheetWarning }) {
   const errorRowCount = new Set(errors.map(e => e.row)).size;
   const cleanRows = checked - errorRowCount;
 
   document.getElementById('dropZone').style.display = 'none';
   document.getElementById('statusBar').style.display = 'none';
   document.getElementById('results').style.display = 'block';
+
+  let sheetNote = '';
+  if (sheetWarning) {
+    sheetNote = `<div class="status-bar error" style="display:block;margin-bottom:1rem">
+      <i class="ti ti-alert-triangle"></i> ${escapeHtml(sheetWarning)}
+    </div>`;
+  } else if (sheetName) {
+    sheetNote = `<div class="sheet-note">Validated sheet: <b>${escapeHtml(sheetName)}</b></div>`;
+  }
+  document.getElementById('sheetNote').innerHTML = sheetNote;
 
   document.getElementById('summaryGrid').innerHTML = `
     <div class="metric"><div class="label">Rows checked</div><div class="val">${checked}</div></div>
@@ -78,6 +88,15 @@ function downloadCsv(errors) {
   a.click();
 }
 
+function selectTargetSheet(workbook) {
+  const target = RULES.TARGET_SHEET_NAME.trim().toLowerCase();
+  const matchName = workbook.SheetNames.find(name => name.trim().toLowerCase() === target);
+  if (matchName) {
+    return { sheetName: matchName, usedFallback: false };
+  }
+  return { sheetName: workbook.SheetNames[0], usedFallback: true };
+}
+
 function handleFile(file) {
   if (!file) {
     setStatus('No file selected.', 'error');
@@ -92,7 +111,9 @@ function handleFile(file) {
       const wb = ext === 'csv'
         ? XLSX.read(e.target.result, { type: 'string' })
         : XLSX.read(e.target.result, { type: 'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
+
+      const { sheetName, usedFallback } = selectTargetSheet(wb);
+      const ws = wb.Sheets[sheetName];
       const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
       const result = Validator.validateLeadData(data);
@@ -100,6 +121,13 @@ function handleFile(file) {
         setStatus('File appears empty or has no data rows.', 'error');
         return;
       }
+
+      if (usedFallback) {
+        result.sheetWarning = `No sheet named "${RULES.TARGET_SHEET_NAME}" was found — validated the first sheet ("${sheetName}") instead.`;
+      } else {
+        result.sheetWarning = null;
+      }
+      result.sheetName = sheetName;
       renderResults(result);
     } catch (err) {
       console.error(err);

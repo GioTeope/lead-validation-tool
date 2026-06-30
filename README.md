@@ -20,7 +20,7 @@ The team currently receives lead upload files and manually cross-checks them aga
 | **First / Last Name** | Must not contain alphanumeric values (e.g. "Dev12"), must not contain an email address |
 | **Job Title** | Must not match the exclusion list, and must not contain "student" anywhere in the title |
 | **Country** | Must not be blank, must match a value (name or ISO code) from the official country list |
-| **Language** | Must not be blank, must match a value (name or code) from the official language list |
+| **Language** | Must not be blank, must match the real-world format `{language}-default (code)` for base languages (e.g. `english-default (en-us)`, `french-default (fr)`) or `{language-region} (code)` for regional/script variants (e.g. `chinese-simplified (zh-hans)`, `french-canadian (fr-ca)`) — plain names/codes also accepted as a fallback |
 
 All rule values live in [`src/rules.js`](src/rules.js) (email/company/job title lists) and [`src/country-language-data.js`](src/country-language-data.js) (Country/Language dropdown lists) — update those files whenever the MaSH template changes. No other code needs to change.
 
@@ -31,6 +31,10 @@ Open `index.html` in any browser (double-click it, or right-click → Open with 
 
 **Option B — host it internally:**
 Drop the whole folder onto any internal static file host (SharePoint, internal web server, GitHub Pages, etc.) so the team can access it via a URL instead of a local file.
+
+### Sheet handling
+
+MaSH lead upload files arrive as 2-sheet workbooks (e.g. "List Template" + "E164 Phone Format"). The tool only validates the **"List Template"** sheet and ignores any other sheets in the file. If a file doesn't contain a sheet with that exact name, the tool falls back to validating the first sheet instead and shows a warning so you know it had to guess.
 
 ## Project structure
 
@@ -44,7 +48,9 @@ lead-validation-tool/
 │   ├── validator.js      # Core validation logic (pure functions, no UI)
 │   └── app.js            # UI wiring: file upload, rendering, CSV export
 ├── sample-data/
-│   └── sample-leads.csv  # Example file for testing
+│   ├── sample-leads.csv               # Small example file (8 rows) for quick testing
+│   └── sample-leads-5000-with-invalid.xlsx  # 5,000-row, 2-sheet file ("List Template" +
+│                                              # "E164 Phone Format"), ~30% invalid rows
 └── docs/
     └── validation-rules.md  # Plain-English explanation of every rule, for non-technical reference
 ```

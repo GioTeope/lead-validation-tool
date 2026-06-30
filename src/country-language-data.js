@@ -280,6 +280,12 @@ const COUNTRIES = [
 ];
 
 // Each entry: { name: "Display Name", code: "xx-XX" }
+// NOTE: the actual values used in the Language column follow the format
+// "{name-slug}-default ({code})" in lowercase, e.g. "english-default (en-us)"
+// or "french-canadian-default (fr-ca)". The validator derives this format
+// from the name/code pairs below — see isInReferenceList / buildLanguageDefaultForm
+// in validator.js. Keep name/code as the source of truth; don't hardcode the
+// "-default (...)" strings here.
 const LANGUAGES = [
   { name: "Arabic", code: "ar" },
   { name: "Bahasa Indonesian", code: "id" },
