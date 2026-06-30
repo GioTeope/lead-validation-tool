@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lead File Validator</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+
+<div class="wrap">
+  <header class="page-header">
+    <h1>Lead File Validator</h1>
+    <p class="subtitle">Upload a lead intake file to check it against MaSH validation rules.</p>
+  </header>
+
+  <div id="dropZone" class="drop-zone">
+    <i class="ti ti-table-import" aria-hidden="true"></i>
+    <p><b>Drop your lead Excel file here</b></p>
+    <p style="margin-top:6px">or <span class="link" id="browseLink">browse to upload</span></p>
+    <p class="hint">.xlsx or .csv files accepted</p>
+  </div>
+  <input type="file" id="fileIn" accept=".xlsx,.xls,.csv">
+
+  <div id="statusBar" class="status-bar"></div>
+
+  <div id="results" style="display:none">
+    <div class="summary-grid" id="summaryGrid"></div>
+    <div class="section">
+      <h3>Validation errors</h3>
+      <div style="overflow-x:auto">
+        <table class="error-table" id="errTable">
+          <thead><tr><th>Row</th><th>Field</th><th>Value found</th><th>Issue</th></tr></thead>
+          <tbody id="errBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="dlBtn"><i class="ti ti-download" aria-hidden="true"></i> Download error report (.csv)</button>
+      <button class="btn" id="resetBtn"><i class="ti ti-refresh" aria-hidden="true"></i> Validate another file</button>
+    </div>
+  </div>
+
+  <footer class="page-footer">
+    <p>Validation rules are defined in <code>src/rules.js</code> — update them as the MaSH template changes.</p>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="src/rules.js"></script>
+<script src="src/country-language-data.js"></script>
+<script src="src/validator.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>
