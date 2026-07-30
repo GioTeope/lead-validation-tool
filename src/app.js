@@ -144,7 +144,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const dz = document.getElementById('dropZone');
   const fileInput = document.getElementById('fileIn');
 
-  document.getElementById('browseLink').addEventListener('click', () => fileInput.click());
+  document.getElementById('browseLink').addEventListener('click', (e) => {
+    e.stopPropagation();
+    fileInput.click();
+  });
   fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
 
   dz.addEventListener('click', () => fileInput.click());

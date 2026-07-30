@@ -135,56 +135,59 @@ function isInReferenceList(value, fieldLabel, list) {
 }
 
 /**
- * Builds the expected real-world format for a language value:
- *  - English (any variant: en, en-GB, en-US) always slugs to just
- *    "english", e.g. "english-default (en-us)"
- *  - Base/single-region languages (code has no hyphen, e.g. "fr", "es")
- *    use "{slug}-default ({code})", e.g. "french-default (fr)"
- *  - Regional/script variants (code has a hyphen, e.g. "fr-CA", "zh-Hans")
- *    drop "-default" and slug the full name instead, e.g.
- *    "french-canadian (fr-ca)", "chinese-simplified (zh-hans)",
- *    "portuguese-brazil (pt-br)"
+ * Builds a set of known base language slugs (the first word of each language
+ * name) derived from the LANGUAGES reference list, e.g. "french", "chinese",
+ * "english". Used to validate the first segment of real-world language values.
  */
-function buildLanguageDefaultForm(item) {
-  const baseName = item.name.split(' - ')[0];
-  const isEnglish = baseName.toLowerCase() === 'english';
-  const isRegionalCode = item.code.includes('-');
-
-  if (isEnglish) {
-    return `english-default (${item.code.toLowerCase()})`;
-  }
-  if (isRegionalCode) {
-    const slug = item.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    return `${slug} (${item.code.toLowerCase()})`;
-  }
-  const slug = baseName.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  return `${slug}-default (${item.code.toLowerCase()})`;
+function buildBaseLanguageSlugs() {
+  return new Set(
+    REFERENCE_DATA.LANGUAGES.map(l => {
+      const base = l.name.split(' - ')[0];
+      return base.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    })
+  );
 }
 
 /**
- * Validates the Language column against the "{slug}-default (code)" format
- * (e.g. "english-default (en-us)", "french-canadian-default (fr-ca)"),
- * while still accepting the plain name or code as a fallback.
+ * Validates the Language column using a pattern-based approach that handles
+ * any {language}-{region} combination without needing a hardcoded list of
+ * every variant.
+ *
+ * Valid formats (all lowercase, hyphens):
+ *   - "{language}-{region}"            e.g. "chinese-china", "english-uk"
+ *   - "{language}-{region} ({code})"   e.g. "french-france (fr-fr)"
+ *   - "{language}-default ({code})"    e.g. "english-default (en-us)"
+ *   - "{language}-default"             e.g. "english-default"
+ *
+ * The first segment must be a known language slug derived from the reference
+ * list, so "klingon-default" still fails even though it matches the pattern.
+ *
+ * Plain name (e.g. "English") or code (e.g. "en-US") also accepted as fallback.
  */
 function isValidLanguage(value) {
   if (!value || value.toString().trim() === '') {
     return { ok: false, msg: 'Language should not be blank' };
   }
-  const sRaw = value.toString().trim().toLowerCase();
-  const sNorm = normalizeForMatch(value);
+  const s = value.toString().trim().toLowerCase();
+  // Fallback: explicit language code match only (e.g. "en-US", "fr", "zh-Hans")
+  // Plain display names like "French" or "English" are NOT accepted —
+  // values must always include a region suffix like "french-france".
+  const codeMatch = REFERENCE_DATA.LANGUAGES.some(item =>
+    item.code.toLowerCase() === s
+  );
+  if (codeMatch) return { ok: true };
 
-  const match = REFERENCE_DATA.LANGUAGES.some(item => {
-    if (buildLanguageDefaultForm(item).toLowerCase() === sRaw) return true;
-    if (normalizeForMatch(item.name) === sNorm) return true;
-    if (item.code.toLowerCase() === sRaw) return true;
-    return false;
-  });
-
-  if (!match) {
-    return { ok: false, msg: 'Language must be a valid value from the dropdown list (e.g. "english-default (en-us)")' };
+  // Pattern: {known-lang-slug}-{region} optionally followed by (code)
+  const pattern = /^([a-z][a-z-]*)-([a-z][a-z-]*)(\s+\([a-z0-9-]+\))?$/;
+  const m = s.match(pattern);
+  if (m) {
+    const baseSlugs = buildBaseLanguageSlugs();
+    if (baseSlugs.has(m[1])) return { ok: true };
   }
-  return { ok: true };
+
+  return { ok: false, msg: 'Language must be a valid value (e.g. "english-default (en-us)", "french-france (fr-fr)", "chinese-china")' };
 }
+
 
 /**
  * Validates a 2D array of spreadsheet data (first row = headers).
