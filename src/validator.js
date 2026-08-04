@@ -191,11 +191,15 @@ function isValidLanguage(value) {
 
 /**
  * Validates a 2D array of spreadsheet data (first row = headers).
- * Returns { checked, errors } where errors is a flat list of issues.
+ * Returns { checked, errors, headers, rejectedRows, emptyFile }
+ * - errors: flat list of all issues (for the error table UI)
+ * - headers: original column headers from the file
+ * - rejectedRows: Map of rowNum -> { rawRow, reasons[] } for the
+ *   rejection template export (one row per lead, reasons consolidated)
  */
 function validateLeadData(data) {
   if (!data || data.length < 2) {
-    return { checked: 0, errors: [], emptyFile: true };
+    return { checked: 0, errors: [], headers: [], rejectedRows: new Map(), emptyFile: true };
   }
 
   const headers = data[0].map(h => (h ? h.toString().trim() : ''));
@@ -213,16 +217,24 @@ function validateLeadData(data) {
   };
 
   const errors = [];
+  const rejectedRows = new Map();
   let checked = 0;
 
   rows.forEach((row, i) => {
-    const rowNum = i + 2; // +2 accounts for header row + 1-indexing
+    const rowNum = i + 2;
     const hasData = row.some(c => c !== null && c !== undefined && c.toString().trim() !== '');
     if (!hasData) return;
     checked++;
 
     const pushIfBad = (result, field, value, type) => {
-      if (!result.ok) errors.push({ row: rowNum, field, value: value || '(blank)', issue: result.msg, type });
+      if (!result.ok) {
+        errors.push({ row: rowNum, field, value: value || '(blank)', issue: result.msg, type });
+        // also collect into rejectedRows for the template export
+        if (!rejectedRows.has(rowNum)) {
+          rejectedRows.set(rowNum, { rawRow: row, reasons: [] });
+        }
+        rejectedRows.get(rowNum).reasons.push(`${field}: ${result.msg}`);
+      }
     };
 
     if (colIdx.email > -1) pushIfBad(isValidEmail(row[colIdx.email]), 'Email Address', row[colIdx.email], 'email');
@@ -234,7 +246,7 @@ function validateLeadData(data) {
     if (colIdx.language > -1) pushIfBad(isValidLanguage(row[colIdx.language]), 'Language', row[colIdx.language], 'other');
   });
 
-  return { checked, errors, emptyFile: false };
+  return { checked, errors, headers, rejectedRows, emptyFile: false };
 }
 
 // Browser-global export (no bundler in this lightweight tool)

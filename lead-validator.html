@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lead File Validator — MaSH</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+:root {
+  --bg: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #4a4a4a;
+  --text-muted: #888888;
+  --border: #e3e3e3;
+  --border-strong: #c9c9c9;
+  --surface-1: #f7f7f7;
+  --surface-2: #ffffff;
+  --accent: #2563eb;
+  --accent-bg: #eaf1ff;
+  --success: #1a7f37;
+  --success-bg: #e7f6ea;
+  --danger: #c0322d;
+  --danger-bg: #fbe9e8;
+  --warning: #9a6700;
+  --warning-bg: #fff3da;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text-primary);
+  background: var(--bg);
+}
+
+.wrap { max-width: 760px; margin: 0 auto; padding: 2rem 1.25rem; }
+
+.page-header { margin-bottom: 1.5rem; }
+.page-header h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+.subtitle { color: var(--text-secondary); font-size: 14px; }
+
+.drop-zone {
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 12px;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  background: var(--surface-1);
+}
+.drop-zone.drag { background: var(--accent-bg); border-color: var(--accent); }
+.drop-zone i { font-size: 32px; color: var(--text-muted); display: block; margin-bottom: .75rem; }
+.drop-zone p { color: var(--text-secondary); font-size: 14px; }
+.drop-zone p b { color: var(--text-primary); font-weight: 600; }
+.drop-zone .hint { margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+.link { color: var(--accent); cursor: pointer; text-decoration: underline; }
+
+input[type="file"] { display: none; }
+
+.status-bar { margin-top: 1rem; padding: .75rem 1rem; border-radius: var(--radius); font-size: 13px; display: none; }
+.status-bar.info { background: var(--accent-bg); color: var(--accent); }
+.status-bar.error { background: var(--danger-bg); color: var(--danger); }
+.status-bar.success { background: var(--success-bg); color: var(--success); }
+
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 1.5rem; }
+.sheet-note { font-size: 12px; color: var(--text-muted); margin-bottom: .5rem; }
+.sheet-note b { color: var(--text-secondary); }
+.metric { background: var(--surface-1); border-radius: var(--radius); padding: .9rem 1rem; border: 1px solid var(--border); }
+.metric .label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.metric .val { font-size: 24px; font-weight: 600; }
+.metric.ok .val { color: var(--success); }
+.metric.bad .val { color: var(--danger); }
+.metric.warn .val { color: var(--warning); }
+
+.section { margin-top: 1.75rem; }
+.section h3 { font-size: 14px; font-weight: 600; margin-bottom: .6rem; color: var(--text-secondary); }
+
+.error-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.error-table th { text-align: left; padding: 8px 10px; background: var(--surface-1); color: var(--text-secondary); font-weight: 600; font-size: 12px; border-bottom: 1px solid var(--border-strong); }
+.error-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.error-table tr:last-child td { border-bottom: none; }
+.error-table .muted { color: var(--text-muted); }
+.error-table .value-cell { color: var(--text-secondary); max-width: 220px; word-break: break-all; }
+.empty-state { text-align: center; padding: 1.75rem; color: var(--text-muted); }
+.empty-state i { color: var(--success); font-size: 18px; vertical-align: -3px; margin-right: 6px; }
+
+.badge { display: inline-block; font-size: 11px; padding: 2px 9px; border-radius: 20px; font-weight: 600; }
+.badge.email { background: var(--accent-bg); color: var(--accent); }
+.badge.company { background: var(--warning-bg); color: var(--warning); }
+.badge.name { background: #f1eaff; color: #6e3fc0; }
+.badge.jobtitle { background: var(--danger-bg); color: var(--danger); }
+.badge.other { background: var(--surface-1); color: var(--text-secondary); }
+
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 1.5rem; }
+.btn { padding: 9px 18px; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text-primary); font-size: 13px; cursor: pointer; font-family: inherit; }
+.btn:hover { background: var(--surface-1); }
+.btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
+.btn.primary:hover { background: #1d4fd0; }
+.btn i { margin-right: 4px; }
+
+.page-footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted); }
+.page-footer code { background: var(--surface-1); padding: 1px 5px; border-radius: 4px; }
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page-header">
+    <h1>Lead File Validator</h1>
+    <p class="subtitle">Upload a lead intake file to check it against MaSH validation rules.</p>
+  </header>
+  <div id="dropZone" class="drop-zone">
+    <i class="ti ti-table-import" aria-hidden="true"></i>
+    <p><b>Drop your lead Excel file here</b></p>
+    <p style="margin-top:6px">or <span class="link" id="browseLink">browse to upload</span></p>
+    <p class="hint">.xlsx or .csv files accepted &nbsp;·&nbsp; Only the <b>List Template</b> sheet is validated</p>
+  </div>
+  <input type="file" id="fileIn" accept=".xlsx,.xls,.csv">
+  <div id="statusBar" class="status-bar"></div>
+  <div id="results" style="display:none">
+    <div id="sheetNote"></div>
+    <div class="summary-grid" id="summaryGrid"></div>
+    <div class="section">
+      <h3>Validation errors</h3>
+      <div style="overflow-x:auto">
+        <table class="error-table" id="errTable">
+          <thead><tr><th>Row</th><th>Field</th><th>Value found</th><th>Issue</th></tr></thead>
+          <tbody id="errBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="dlBtn"><i class="ti ti-download" aria-hidden="true"></i> Download error report (.csv)</button>
+      <button class="btn primary" id="dlRejBtn"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Download rejected leads (.csv)</button>
+      <button class="btn" id="resetBtn"><i class="ti ti-refresh" aria-hidden="true"></i> Validate another file</button>
+    </div>
+  </div>
+  <footer class="page-footer">
+    <p>To update validation rules, edit the <b>RULES</b> section inside this file's <code>&lt;script&gt;</code> block.</p>
+  </footer>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// ── RULES ── Update these when the MaSH validation template changes
+// ═══════════════════════════════════════════════════════════════════
+// Exact email addresses that are known to be scrubbed / placeholder /
+// blacklisted leads. Only these specific addresses are blocked — the
+// domains they belong to (hotmail.com, amazon.com, etc.) are NOT blocked.
+const SCRUBBED_EMAILS = [
+  'tes@tst.com',
+  'lin-william@hotmail.com',
+  'seitisu@amazon.com',
+  'francis@adf-foods.com',
+  'krishnasantosh.maadasu@ltimindtree.com'
+];
+
+// Domains that are fully blocked — ANY email address ending in one of
+// these domains is invalid, regardless of the name before the @.
+const BLOCKED_DOMAINS = [
+  'test.com',
+  'marketo.in',
+  'microsoft.com',
+  'example.com'
+];
+
+// Company name values that indicate scrubbed / invalid / placeholder data.
+// These are matched EXACTLY (case-insensitive) — short/ambiguous words live
+// here rather than in the keyword list below, to avoid false positives on
+// real company names (e.g. "No" as an exact value is bad, but a company
+// called "Noble Corp" should NOT be flagged just for containing "No").
+const SCRUBBED_COMPANIES = [
+  'should contain At least 2 charcters',
+  'Currently unemployeed',
+  'ASU student',
+  'Study',
+  'Example',
+  'NA',
+  'NA.',
+  'public',
+  'private',
+  'myself',
+  'studying',
+  'Studing',
+  'Etudante',
+  'Étudiant',
+  'Etudiant',
+  'Etudiante',
+  'Étudiante',
+  'Free',
+  'HA !',
+  'aaa',
+  'Self owned business',
+  'Self Entrepreneur',
+  'Self work',
+  'Self worker',
+  'My work',
+  'My business',
+  'Own Busibess',
+  'No Company',
+  'NoCompany',
+  'No Aplicable',
+  'No Applicable',
+  'No poseo',
+  'no hay',
+  'no tengo',
+  'No me encuentro',
+  'Noentiendo',
+  'No estoy empleado',
+  'no dispongo',
+  'In college 1st year',
+  'In college',
+  'Independiente',
+  'Independient',
+  'Independer',
+  'Independientemente',
+  'Indépendant',
+  'Independent Contractor',
+  'Independent Consultant',
+  'Consultor independiente',
+  'Personal',
+  'No aplica',
+  'Not yet',
+  'Any',
+  'No',
+  'Own Company',
+  'Me',
+  'person',
+  'Non',
+  'Pub',
+  'Test',
+  'Marketo',
+  'Finland',
+  'hotmail.com',
+  'tes@tst.com'
+];
+
+// Keywords/substrings that indicate an invalid company name if found ANYWHERE
+// in the value — use for distinctive words unlikely to appear in a real
+// company name (e.g. "Freelance", "Estudiante"). Matching is case-insensitive
+// and accent-insensitive.
+const SCRUBBED_COMPANY_KEYWORDS = [
+  'freelance',
+  'freelancer',
+  'freelancing',
+  'freel lance',
+  'estudiante',
+  'trabajador-independiente',
+  'trabajador independiente',
+  'student'
+];
+
+// Patterns that mean the company name is just symbols/punctuation with no
+// real text (e.g. "# , .", "$,%", "#$").
+const SYMBOL_ONLY_PATTERN = /^[\s#.,$%!*\-_'"]+$/;
+
+// Job titles that should be flagged/removed (students, independent-type roles)
+const BAD_JOB_TITLES = [
+  'Independent Consultant – Industrial Sociology',
+  'Independent Director',
+  'Student',
+  'Full time student',
+  'College Student',
+  'University Student',
+  'Working Student',
+  'Doctoral Student',
+  'Student Trainee',
+  'Student Co-op',
+  'AFIT Graduate Student',
+  'Working student Corporate Information Security',
+  'Graduate Student',
+  'Working Student AIDigital Transformation Adoption',
+  'Artificial Intelligence Student',
+  'Thesis Student'
+];
+
+// Keywords/substrings that indicate an invalid job title if found ANYWHERE
+// in the value (case-insensitive) — catches variations not in the exact
+// list above, e.g. "Part-time Student Worker" or "Student Ambassador".
+const BAD_JOB_TITLE_KEYWORDS = [
+  'student'
+];
+
+// Name of the sheet in MaSH lead upload files that should be validated.
+// These files arrive with 2 sheets (e.g. "List Template" + "E164 Phone
+// Format") — only the lead data sheet should be checked.
+const TARGET_SHEET_NAME = 'List Template';
+
+// Column header aliases — lets the tool find columns even if naming varies slightly
+const COLUMN_ALIASES = {
+  email: ['Email Address', 'Email', 'EmailAddress'],
+  company: ['Company Name', 'CompanyName', 'Company'],
+  firstName: ['First Name', 'FirstName'],
+  lastName: ['Last Name', 'LastName'],
+  jobTitle: ['Job Title', 'JobTitle'],
+  country: ['Country'],
+  language: ['Language']
+};
+
+// Exported for use in validator.js / app.js (browser-global, no bundler needed)
+window.RULES = {
+  SCRUBBED_EMAILS,
+  BLOCKED_DOMAINS,
+  SCRUBBED_COMPANIES,
+  SCRUBBED_COMPANY_KEYWORDS,
+  SYMBOL_ONLY_PATTERN,
+  BAD_JOB_TITLES,
+  BAD_JOB_TITLE_KEYWORDS,
+  TARGET_SHEET_NAME,
+  COLUMN_ALIASES
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// ── REFERENCE DATA ── Country and Language dropdown lists
+// ═══════════════════════════════════════════════════════════════════
+// Each entry: { name: "Display Name", code: "XX" }
+const COUNTRIES = [
+  { name: "Afghanistan", code: "AF" },
+  { name: "ÅlandIslands", code: "AX" },
+  { name: "Albania", code: "AL" },
+  { name: "Algeria", code: "DZ" },
+  { name: "AmericanSamoa", code: "AS" },
+  { name: "Andorra", code: "AD" },
+  { name: "Angola", code: "AO" },
+  { name: "Anguilla", code: "AI" },
+  { name: "Antarctica", code: "AQ" },
+  { name: "AntiguaandBarbuda", code: "AG" },
+  { name: "Argentina", code: "AR" },
+  { name: "Armenia", code: "AM" },
+  { name: "Aruba", code: "AW" },
+  { name: "Australia", code: "AU" },
+  { name: "Austria", code: "AT" },
+  { name: "Azerbaijan", code: "AZ" },
+  { name: "Bahamas,The", code: "BS" },
+  { name: "Bahrain", code: "BH" },
+  { name: "Bangladesh", code: "BD" },
+  { name: "Barbados", code: "BB" },
+  { name: "Belarus", code: "BY" },
+  { name: "Belgium", code: "BE" },
+  { name: "Belize", code: "BZ" },
+  { name: "Benin", code: "BJ" },
+  { name: "Bermuda", code: "BM" },
+  { name: "Bhutan", code: "BT" },
+  { name: "Bolivia", code: "BO" },
+  { name: "Bonaire", code: "BQ" },
+  { name: "BosniaandHerzegovina", code: "BA" },
+  { name: "Botswana", code: "BW" },
+  { name: "BouvetIsland", code: "BV" },
+  { name: "Brazil", code: "BR" },
+  { name: "BritishIndianOceanTerritory", code: "IO" },
+  { name: "BritishVirginIslands", code: "VG" },
+  { name: "Brunei", code: "BN" },
+  { name: "Bulgaria", code: "BG" },
+  { name: "BurkinaFaso", code: "BF" },
+  { name: "Burundi", code: "BI" },
+  { name: "Cambodia", code: "KH" },
+  { name: "Cameroon", code: "CM" },
+  { name: "Canada", code: "CA" },
+  { name: "CapeVerde", code: "CV" },
+  { name: "CaymanIslands", code: "KY" },
+  { name: "CentralAfricanRepublic", code: "CF" },
+  { name: "Chad", code: "TD" },
+  { name: "Czechia", code: "CZ" },
+  { name: "Chile", code: "CL" },
+  { name: "China", code: "CN" },
+  { name: "ChristmasIsland", code: "CX" },
+  { name: "Cocos(Keeling)Islands", code: "CC" },
+  { name: "Colombia", code: "CO" },
+  { name: "Comoros", code: "KM" },
+  { name: "Congo", code: "CG" },
+  { name: "Congo(DRC)", code: "CD" },
+  { name: "CookIslands", code: "CK" },
+  { name: "CostaRica", code: "CR" },
+  { name: "CôtedIvoire", code: "CI" },
+  { name: "Croatia", code: "HR" },
+  { name: "Cuba", code: "CU" },
+  { name: "Curaçao", code: "CW" },
+  { name: "Cyprus", code: "CY" },
+  { name: "CzechRepublic", code: "CZ" },
+  { name: "DemocraticRepublicofTimor-Leste", code: "TL" },
+  { name: "Denmark", code: "DK" },
+  { name: "Djibouti", code: "DJ" },
+  { name: "Dominica", code: "DM" },
+  { name: "DominicanRepublic", code: "DO" },
+  { name: "Ecuador", code: "EC" },
+  { name: "Egypt", code: "EG" },
+  { name: "ElSalvador", code: "SV" },
+  { name: "EquatorialGuinea", code: "GQ" },
+  { name: "Eritrea", code: "ER" },
+  { name: "Estonia", code: "EE" },
+  { name: "Ethiopia", code: "ET" },
+  { name: "FalklandIslands(IslasMalvinas)", code: "FK" },
+  { name: "FaroeIslands", code: "FO" },
+  { name: "Fiji", code: "FJ" },
+  { name: "FijiIslands", code: "FJ" },
+  { name: "Finland", code: "FI" },
+  { name: "France", code: "FR" },
+  { name: "FrenchGuiana", code: "GF" },
+  { name: "FrenchPolynesia", code: "PF" },
+  { name: "FrenchSouthernandAntarcticLands", code: "TF" },
+  { name: "Gabon", code: "GA" },
+  { name: "Gambia,The", code: "GM" },
+  { name: "Georgia", code: "GE" },
+  { name: "Germany", code: "DE" },
+  { name: "Ghana", code: "GH" },
+  { name: "Gibraltar", code: "GI" },
+  { name: "Greece", code: "GR" },
+  { name: "Greenland", code: "GL" },
+  { name: "Grenada", code: "GD" },
+  { name: "Guadeloupe", code: "GP" },
+  { name: "Guam", code: "GU" },
+  { name: "Guatemala", code: "GT" },
+  { name: "Guernsey", code: "GG" },
+  { name: "Guinea", code: "GN" },
+  { name: "Guinea-Bissau", code: "GW" },
+  { name: "Guyana", code: "GY" },
+  { name: "Haiti", code: "HT" },
+  { name: "HeardIslandandMcDonaldIslands", code: "HM" },
+  { name: "HolySee(VaticanCity)", code: "VA" },
+  { name: "Honduras", code: "HN" },
+  { name: "HongKongSAR", code: "HK" },
+  { name: "Hungary", code: "HU" },
+  { name: "Iceland", code: "IS" },
+  { name: "India", code: "IN" },
+  { name: "Indonesia", code: "ID" },
+  { name: "Iran", code: "IR" },
+  { name: "Iraq", code: "IQ" },
+  { name: "Ireland", code: "IE" },
+  { name: "IsleofMan", code: "IM" },
+  { name: "Israel", code: "IL" },
+  { name: "Italy", code: "IT" },
+  { name: "Jamaica", code: "JM" },
+  { name: "JanMayen", code: "XJ" },
+  { name: "Japan", code: "JP" },
+  { name: "Jersey", code: "JE" },
+  { name: "Jordan", code: "JO" },
+  { name: "Kazakhstan", code: "KZ" },
+  { name: "Kenya", code: "KE" },
+  { name: "Kiribati", code: "KI" },
+  { name: "Korea", code: "KR" },
+  { name: "Kuwait", code: "KW" },
+  { name: "Kyrgyzstan", code: "KG" },
+  { name: "Laos", code: "LA" },
+  { name: "Latvia", code: "LV" },
+  { name: "Lebanon", code: "LB" },
+  { name: "Lesotho", code: "LS" },
+  { name: "Liberia", code: "LR" },
+  { name: "Libya", code: "LY" },
+  { name: "Liechtenstein", code: "LI" },
+  { name: "Lithuania", code: "LT" },
+  { name: "Luxembourg", code: "LU" },
+  { name: "MacaoSAR", code: "MO" },
+  { name: "Macedonia,FYRO", code: "MK" },
+  { name: "Madagascar", code: "MG" },
+  { name: "Malawi", code: "MW" },
+  { name: "Malaysia", code: "MY" },
+  { name: "Maldives", code: "MV" },
+  { name: "Mali", code: "ML" },
+  { name: "Malta", code: "MT" },
+  { name: "MarshallIslands", code: "MH" },
+  { name: "Martinique", code: "MQ" },
+  { name: "Mauritania", code: "MR" },
+  { name: "Mauritius", code: "MU" },
+  { name: "Mayotte", code: "YT" },
+  { name: "Mexico", code: "MX" },
+  { name: "Micronesia", code: "FM" },
+  { name: "Moldova", code: "MD" },
+  { name: "Monaco", code: "MC" },
+  { name: "Mongolia", code: "MN" },
+  { name: "Montenegro", code: "ME" },
+  { name: "Montserrat", code: "MS" },
+  { name: "Morocco", code: "MA" },
+  { name: "Mozambique", code: "MZ" },
+  { name: "Myanmar", code: "MM" },
+  { name: "Namibia", code: "NA" },
+  { name: "Nauru", code: "NR" },
+  { name: "Nepal", code: "NP" },
+  { name: "Netherlands", code: "NL" },
+  { name: "NewCaledonia", code: "NC" },
+  { name: "NewZealand", code: "NZ" },
+  { name: "Nicaragua", code: "NI" },
+  { name: "Niger", code: "NE" },
+  { name: "Nigeria", code: "NG" },
+  { name: "Niue", code: "NU" },
+  { name: "NorfolkIsland", code: "NF" },
+  { name: "NorthKorea", code: "KP" },
+  { name: "NorthernMarianaIslands", code: "MP" },
+  { name: "Norway", code: "NO" },
+  { name: "Oman", code: "OM" },
+  { name: "Pakistan", code: "PK" },
+  { name: "Palau", code: "PW" },
+  { name: "PalestinianAuthority", code: "PS" },
+  { name: "Panama", code: "PA" },
+  { name: "PapuaNewGuinea", code: "PG" },
+  { name: "Paraguay", code: "PY" },
+  { name: "Peru", code: "PE" },
+  { name: "Philippines", code: "PH" },
+  { name: "PitcairnIslands", code: "PN" },
+  { name: "Poland", code: "PL" },
+  { name: "Portugal", code: "PT" },
+  { name: "PuertoRico", code: "PR" },
+  { name: "Qatar", code: "QA" },
+  { name: "Reunion", code: "RE" },
+  { name: "Romania", code: "RO" },
+  { name: "Russia", code: "RU" },
+  { name: "Rwanda", code: "RW" },
+  { name: "Saba", code: "XS" },
+  { name: "SaintBarthélemy", code: "BL" },
+  { name: "SaintHelena", code: "SH" },
+  { name: "SaintKittsandNevis", code: "KN" },
+  { name: "SaintLucia", code: "LC" },
+  { name: "SaintMartin", code: "MF" },
+  { name: "SaintPierreandMiquelon", code: "PM" },
+  { name: "SaintVincentandtheGrenadines", code: "VC" },
+  { name: "Samoa", code: "WS" },
+  { name: "SanMarino", code: "SM" },
+  { name: "SãoTomeandPrincipe", code: "ST" },
+  { name: "SaudiArabia", code: "SA" },
+  { name: "Senegal", code: "SN" },
+  { name: "Serbia", code: "RS" },
+  { name: "Seychelles", code: "SC" },
+  { name: "SierraLeone", code: "SL" },
+  { name: "Singapore", code: "SG" },
+  { name: "SintEustatius", code: "XE" },
+  { name: "SintMaarten", code: "SX" },
+  { name: "Slovakia", code: "SK" },
+  { name: "Slovenia", code: "SI" },
+  { name: "SolomonIslands", code: "SB" },
+  { name: "Somalia", code: "SO" },
+  { name: "SouthAfrica", code: "ZA" },
+  { name: "SouthSudan", code: "SS" },
+  { name: "SouthGeorgiaandSandwichIslands", code: "GS" },
+  { name: "Spain", code: "ES" },
+  { name: "SriLanka", code: "LK" },
+  { name: "St.Helena", code: "SH" },
+  { name: "St.KittsandNevis", code: "KN" },
+  { name: "St.Lucia", code: "LC" },
+  { name: "St.PierreandMiquelon", code: "PM" },
+  { name: "St.VincentandtheGrenadines", code: "VC" },
+  { name: "Sudan", code: "SD" },
+  { name: "Suriname", code: "SR" },
+  { name: "Svalbard", code: "SJ" },
+  { name: "SvalbardandJanMayen", code: "SJ" },
+  { name: "Swaziland", code: "SZ" },
+  { name: "Sweden", code: "SE" },
+  { name: "Switzerland", code: "CH" },
+  { name: "Syria", code: "SY" },
+  { name: "Taiwan", code: "TW" },
+  { name: "Tajikistan", code: "TJ" },
+  { name: "Tanzania", code: "TZ" },
+  { name: "Thailand", code: "TH" },
+  { name: "Timor-Leste", code: "TL" },
+  { name: "Togo", code: "TG" },
+  { name: "Tokelau", code: "TK" },
+  { name: "Tonga", code: "TO" },
+  { name: "TrinidadandTobago", code: "TT" },
+  { name: "Tunisia", code: "TN" },
+  { name: "Turkey", code: "TR" },
+  { name: "Türkiye", code: "TR" },
+  { name: "Turkmenistan", code: "TM" },
+  { name: "TurksandCaicosIslands", code: "TC" },
+  { name: "Tuvalu", code: "TV" },
+  { name: "U.S.MinorOutlyingIslands", code: "UM" },
+  { name: "Uganda", code: "UG" },
+  { name: "Ukraine", code: "UA" },
+  { name: "UnitedArabEmirates", code: "AE" },
+  { name: "UnitedKingdom", code: "GB" },
+  { name: "UnitedStates", code: "US" },
+  { name: "Uruguay", code: "UY" },
+  { name: "USMinorOutlyingIslands", code: "UM" },
+  { name: "USVirginIslands", code: "VI" },
+  { name: "Uzbekistan", code: "UZ" },
+  { name: "Vanuatu", code: "VU" },
+  { name: "VaticanCity", code: "VA" },
+  { name: "Venezuela", code: "VE" },
+  { name: "Vietnam", code: "VN" },
+  { name: "VirginIslands,British", code: "VG" },
+  { name: "VirginIslands,U.S.", code: "VI" },
+  { name: "WallisandFutuna", code: "WF" },
+  { name: "WesternSahara", code: "EH" },
+  { name: "Yemen", code: "YE" },
+  { name: "Zambia", code: "ZM" },
+  { name: "Zimbabwe", code: "ZW" }
+];
+
+// Each entry: { name: "Display Name", code: "xx-XX" }
+// NOTE: the actual values used in the Language column follow the format
+// "{name-slug}-default ({code})" in lowercase, e.g. "english-default (en-us)"
+// or "french-canadian-default (fr-ca)". The validator derives this format
+// from the name/code pairs below — see isInReferenceList / buildLanguageDefaultForm
+// in validator.js. Keep name/code as the source of truth; don't hardcode the
+// "-default (...)" strings here.
+const LANGUAGES = [
+  { name: "Arabic", code: "ar" },
+  { name: "Bahasa Indonesian", code: "id" },
+  { name: "Bosnian", code: "bs" },
+  { name: "Bulgarian", code: "bg" },
+  { name: "Catalan", code: "ca" },
+  { name: "Chinese - Simplified", code: "zh-Hans" },
+  { name: "Chinese - Taiwan", code: "zh-TW" },
+  { name: "Chinese - Traditional", code: "zh-Hant" },
+  { name: "Croatian", code: "hr" },
+  { name: "Czech", code: "cs" },
+  { name: "Danish", code: "da" },
+  { name: "Dutch", code: "nl" },
+  { name: "English", code: "en" },
+  { name: "English - UK", code: "en-GB" },
+  { name: "English - United States", code: "en-US" },
+  { name: "Estonian", code: "et" },
+  { name: "Finnish", code: "fi" },
+  { name: "French", code: "fr" },
+  { name: "French - Canadian", code: "fr-CA" },
+  { name: "French - Switzerland", code: "fr-CH" },
+  { name: "German", code: "de" },
+  { name: "Greek", code: "el" },
+  { name: "Hebrew", code: "he" },
+  { name: "Hungarian", code: "hu" },
+  { name: "Italian", code: "it" },
+  { name: "Japanese", code: "ja" },
+  { name: "Korean", code: "ko" },
+  { name: "Latvian", code: "lv" },
+  { name: "Lithuanian", code: "lt" },
+  { name: "Macedonian", code: "mk" },
+  { name: "Malay", code: "ms" },
+  { name: "Norwegian", code: "no" },
+  { name: "Polish", code: "pl" },
+  { name: "Portuguese", code: "pt" },
+  { name: "Portuguese - Brazil", code: "pt-BR" },
+  { name: "Portuguese - Portugal", code: "pt-PT" },
+  { name: "Romanian", code: "ro" },
+  { name: "Russian", code: "ru" },
+  { name: "Serbian", code: "sr" },
+  { name: "Slovak", code: "sk" },
+  { name: "Slovenian", code: "sl" },
+  { name: "Spanish", code: "es" },
+  { name: "Spanish - LATAM", code: "es-AR" },
+  { name: "Swedish", code: "sv" },
+  { name: "Thai", code: "th" },
+  { name: "Turkish", code: "tr" },
+  { name: "Ukrainian", code: "uk" },
+  { name: "Vietnamese", code: "vi" }
+];
+
+window.REFERENCE_DATA = { COUNTRIES, LANGUAGES };
+
+// ═══════════════════════════════════════════════════════════════════
+// ── VALIDATOR ── Core logic (pure functions, no DOM)
+// ═══════════════════════════════════════════════════════════════════
+function normalizeHeader(h) {
+  if (!h) return '';
+  return h.toString().trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function findColumn(headers, candidates) {
+  for (const c of candidates) {
+    const idx = headers.findIndex(h => normalizeHeader(h) === normalizeHeader(c));
+    if (idx > -1) return idx;
+  }
+  return -1;
+}
+
+function isValidEmail(value) {
+  if (!value) return { ok: false, msg: 'Email is blank' };
+  const s = value.toString().trim();
+  if (!s.includes('@') || s.startsWith('@') || s.endsWith('@')) {
+    return { ok: false, msg: 'Invalid email format' };
+  }
+  const [, domain] = s.split('@');
+  if (!domain || !domain.includes('.')) {
+    return { ok: false, msg: 'Invalid email format' };
+  }
+  if (RULES.SCRUBBED_EMAILS.map(e => e.toLowerCase()).includes(s.toLowerCase())) {
+    return { ok: false, msg: 'Scrubbed / blacklisted email address' };
+  }
+  if (RULES.BLOCKED_DOMAINS.map(d => d.toLowerCase()).includes(domain.toLowerCase())) {
+    return { ok: false, msg: `Email domain "${domain}" is blocked` };
+  }
+  return { ok: true };
+}
+
+// Strips accents so "Étudiant" and "Etudiant" match the same way
+function stripAccents(s) {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function isValidCompany(value) {
+  if (!value || value.toString().trim() === '') {
+    return { ok: false, msg: 'Company name is blank (must not be null)' };
+  }
+  const s = value.toString().trim();
+
+  if (RULES.SYMBOL_ONLY_PATTERN.test(s)) {
+    return { ok: false, msg: 'Company name contains only symbols/punctuation, no real text' };
+  }
+  if (s.length < 2) {
+    return { ok: false, msg: 'Company name must be at least 2 characters' };
+  }
+
+  const sNorm = stripAccents(s.toLowerCase());
+
+  const exactMatch = RULES.SCRUBBED_COMPANIES.some(c => stripAccents(c.toLowerCase()) === sNorm);
+  if (exactMatch) {
+    return { ok: false, msg: 'Invalid company name value' };
+  }
+
+  const keywordMatch = RULES.SCRUBBED_COMPANY_KEYWORDS.some(kw => sNorm.includes(stripAccents(kw.toLowerCase())));
+  if (keywordMatch) {
+    return { ok: false, msg: 'Company name contains a disallowed keyword (e.g. freelance/student/estudiante)' };
+  }
+
+  return { ok: true };
+}
+
+function isValidName(value, fieldLabel) {
+  if (!value || value.toString().trim() === '') return { ok: true }; // blank names aren't flagged per template
+  const s = value.toString().trim();
+  if (/[a-zA-Z]/.test(s) && /[0-9]/.test(s)) {
+    return { ok: false, msg: `${fieldLabel} should not contain alphanumeric values (e.g. Dev12)` };
+  }
+  if (s.includes('@')) {
+    return { ok: false, msg: `${fieldLabel} should not contain an email address` };
+  }
+  return { ok: true };
+}
+
+function isValidJobTitle(value) {
+  if (!value || value.toString().trim() === '') return { ok: true };
+  const s = value.toString().trim();
+  const sNorm = stripAccents(s.toLowerCase());
+
+  const exactMatch = RULES.BAD_JOB_TITLES.some(t => stripAccents(t.toLowerCase()) === sNorm);
+  if (exactMatch) {
+    return { ok: false, msg: 'Job title is on the exclusion list (student / independent type)' };
+  }
+
+  const keywordMatch = RULES.BAD_JOB_TITLE_KEYWORDS.some(kw => sNorm.includes(stripAccents(kw.toLowerCase())));
+  if (keywordMatch) {
+    return { ok: false, msg: 'Job title contains a disallowed keyword (e.g. student)' };
+  }
+
+  return { ok: true };
+}
+
+function isNotBlank(value, fieldLabel) {
+  if (!value || value.toString().trim() === '') {
+    return { ok: false, msg: `${fieldLabel} should not be blank` };
+  }
+  return { ok: true };
+}
+
+/**
+ * Validates a value against a reference list of { name, code } pairs.
+ * Accepts either the full name or the code. Matching is case-insensitive
+ * and ignores spaces/punctuation differences (e.g. "United States" matches
+ * "UnitedStates", "Côte d'Ivoire" matches "CôtedIvoire").
+ */
+function normalizeForMatch(s) {
+  return s.toString().trim().toLowerCase().replace(/[\s,.'’-]/g, '');
+}
+
+function isInReferenceList(value, fieldLabel, list) {
+  if (!value || value.toString().trim() === '') {
+    return { ok: false, msg: `${fieldLabel} should not be blank` };
+  }
+  const sNorm = normalizeForMatch(value);
+  const sRaw = value.toString().trim().toLowerCase();
+  const match = list.some(item =>
+    normalizeForMatch(item.name) === sNorm || item.code.toLowerCase() === sRaw
+  );
+  if (!match) {
+    return { ok: false, msg: `${fieldLabel} must be a valid value from the dropdown list` };
+  }
+  return { ok: true };
+}
+
+/**
+ * Builds a set of known base language slugs (the first word of each language
+ * name) derived from the LANGUAGES reference list, e.g. "french", "chinese",
+ * "english". Used to validate the first segment of real-world language values.
+ */
+function buildBaseLanguageSlugs() {
+  return new Set(
+    REFERENCE_DATA.LANGUAGES.map(l => {
+      const base = l.name.split(' - ')[0];
+      return base.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    })
+  );
+}
+
+/**
+ * Validates the Language column using a pattern-based approach that handles
+ * any {language}-{region} combination without needing a hardcoded list of
+ * every variant.
+ *
+ * Valid formats (all lowercase, hyphens):
+ *   - "{language}-{region}"            e.g. "chinese-china", "english-uk"
+ *   - "{language}-{region} ({code})"   e.g. "french-france (fr-fr)"
+ *   - "{language}-default ({code})"    e.g. "english-default (en-us)"
+ *   - "{language}-default"             e.g. "english-default"
+ *
+ * The first segment must be a known language slug derived from the reference
+ * list, so "klingon-default" still fails even though it matches the pattern.
+ *
+ * Plain name (e.g. "English") or code (e.g. "en-US") also accepted as fallback.
+ */
+function isValidLanguage(value) {
+  if (!value || value.toString().trim() === '') {
+    return { ok: false, msg: 'Language should not be blank' };
+  }
+  const s = value.toString().trim().toLowerCase();
+  // Fallback: explicit language code match only (e.g. "en-US", "fr", "zh-Hans")
+  // Plain display names like "French" or "English" are NOT accepted —
+  // values must always include a region suffix like "french-france".
+  const codeMatch = REFERENCE_DATA.LANGUAGES.some(item =>
+    item.code.toLowerCase() === s
+  );
+  if (codeMatch) return { ok: true };
+
+  // Pattern: {known-lang-slug}-{region} optionally followed by (code)
+  const pattern = /^([a-z][a-z-]*)-([a-z][a-z-]*)(\s+\([a-z0-9-]+\))?$/;
+  const m = s.match(pattern);
+  if (m) {
+    const baseSlugs = buildBaseLanguageSlugs();
+    if (baseSlugs.has(m[1])) return { ok: true };
+  }
+
+  return { ok: false, msg: 'Language must be a valid value (e.g. "english-default (en-us)", "french-france (fr-fr)", "chinese-china")' };
+}
+
+
+/**
+ * Validates a 2D array of spreadsheet data (first row = headers).
+ * Returns { checked, errors, headers, rejectedRows, emptyFile }
+ * - errors: flat list of all issues (for the error table UI)
+ * - headers: original column headers from the file
+ * - rejectedRows: Map of rowNum -> { rawRow, reasons[] } for the
+ *   rejection template export (one row per lead, reasons consolidated)
+ */
+function validateLeadData(data) {
+  if (!data || data.length < 2) {
+    return { checked: 0, errors: [], headers: [], rejectedRows: new Map(), emptyFile: true };
+  }
+
+  const headers = data[0].map(h => (h ? h.toString().trim() : ''));
+  const rows = data.slice(1);
+  const cols = RULES.COLUMN_ALIASES;
+
+  const colIdx = {
+    email: findColumn(headers, cols.email),
+    company: findColumn(headers, cols.company),
+    firstName: findColumn(headers, cols.firstName),
+    lastName: findColumn(headers, cols.lastName),
+    jobTitle: findColumn(headers, cols.jobTitle),
+    country: findColumn(headers, cols.country),
+    language: findColumn(headers, cols.language)
+  };
+
+  const errors = [];
+  const rejectedRows = new Map();
+  let checked = 0;
+
+  rows.forEach((row, i) => {
+    const rowNum = i + 2;
+    const hasData = row.some(c => c !== null && c !== undefined && c.toString().trim() !== '');
+    if (!hasData) return;
+    checked++;
+
+    const pushIfBad = (result, field, value, type) => {
+      if (!result.ok) {
+        errors.push({ row: rowNum, field, value: value || '(blank)', issue: result.msg, type });
+        // also collect into rejectedRows for the template export
+        if (!rejectedRows.has(rowNum)) {
+          rejectedRows.set(rowNum, { rawRow: row, reasons: [] });
+        }
+        rejectedRows.get(rowNum).reasons.push(`${field}: ${result.msg}`);
+      }
+    };
+
+    if (colIdx.email > -1) pushIfBad(isValidEmail(row[colIdx.email]), 'Email Address', row[colIdx.email], 'email');
+    if (colIdx.company > -1) pushIfBad(isValidCompany(row[colIdx.company]), 'Company Name', row[colIdx.company], 'company');
+    if (colIdx.firstName > -1) pushIfBad(isValidName(row[colIdx.firstName], 'First name'), 'First Name', row[colIdx.firstName], 'name');
+    if (colIdx.lastName > -1) pushIfBad(isValidName(row[colIdx.lastName], 'Last name'), 'Last Name', row[colIdx.lastName], 'name');
+    if (colIdx.jobTitle > -1) pushIfBad(isValidJobTitle(row[colIdx.jobTitle]), 'Job Title', row[colIdx.jobTitle], 'jobtitle');
+    if (colIdx.country > -1) pushIfBad(isInReferenceList(row[colIdx.country], 'Country', REFERENCE_DATA.COUNTRIES), 'Country', row[colIdx.country], 'other');
+    if (colIdx.language > -1) pushIfBad(isValidLanguage(row[colIdx.language]), 'Language', row[colIdx.language], 'other');
+  });
+
+  return { checked, errors, headers, rejectedRows, emptyFile: false };
+}
+
+
+
+window.Validator = { validateLeadData };
+
+// ═══════════════════════════════════════════════════════════════════
+// ── APP ── UI wiring: file upload, results, CSV export
+// ═══════════════════════════════════════════════════════════════════
+function setStatus(msg, type) {
+  const bar = document.getElementById('statusBar');
+  bar.style.display = 'block';
+  bar.className = 'status-bar ' + type;
+  bar.innerHTML = msg;
+}
+
+function resetTool() {
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('statusBar').style.display = 'none';
+  document.getElementById('fileIn').value = '';
+  document.getElementById('dropZone').style.display = '';
+}
+
+function renderResults({ checked, errors, headers, rejectedRows, sheetName, sheetWarning }) {
+  const errorRowCount = new Set(errors.map(e => e.row)).size;
+  const cleanRows = checked - errorRowCount;
+
+  document.getElementById('dropZone').style.display = 'none';
+  document.getElementById('statusBar').style.display = 'none';
+  document.getElementById('results').style.display = 'block';
+
+  let sheetNote = '';
+  if (sheetWarning) {
+    sheetNote = `<div class="status-bar error" style="display:block;margin-bottom:1rem">
+      <i class="ti ti-alert-triangle"></i> ${escapeHtml(sheetWarning)}
+    </div>`;
+  } else if (sheetName) {
+    sheetNote = `<div class="sheet-note">Validated sheet: <b>${escapeHtml(sheetName)}</b></div>`;
+  }
+  document.getElementById('sheetNote').innerHTML = sheetNote;
+
+  document.getElementById('summaryGrid').innerHTML = `
+    <div class="metric"><div class="label">Rows checked</div><div class="val">${checked}</div></div>
+    <div class="metric ok"><div class="label">Clean rows</div><div class="val">${cleanRows}</div></div>
+    <div class="metric bad"><div class="label">Rows with errors</div><div class="val">${errorRowCount}</div></div>
+    <div class="metric warn"><div class="label">Total issues</div><div class="val">${errors.length}</div></div>
+  `;
+
+  const tbody = document.getElementById('errBody');
+  if (errors.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" class="empty-state"><i class="ti ti-circle-check"></i> No issues found — all rows passed validation.</td></tr>`;
+  } else {
+    tbody.innerHTML = errors.map(e => `
+      <tr>
+        <td class="muted">${e.row}</td>
+        <td><span class="badge ${e.type}">${escapeHtml(e.field)}</span></td>
+        <td class="value-cell">${escapeHtml(e.value)}</td>
+        <td>${escapeHtml(e.issue)}</td>
+      </tr>`).join('');
+  }
+
+  document.getElementById('dlBtn').onclick = () => downloadErrorReport(errors);
+  document.getElementById('dlRejBtn').onclick = () => downloadRejectionTemplate(headers, rejectedRows);
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function csvCell(val) {
+  const s = val === null || val === undefined ? '' : String(val);
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+// Original error report: one row per issue (Row / Field / Value / Issue)
+function downloadErrorReport(errors) {
+  const header = ['Row', 'Field', 'Value Found', 'Issue'];
+  const rows = [header.join(',')];
+  if (errors.length === 0) {
+    rows.push('No errors found.');
+  } else {
+    errors.forEach(e => {
+      rows.push([e.row, csvCell(e.field), csvCell(e.value), csvCell(e.issue)].join(','));
+    });
+  }
+  triggerDownload(rows.join('\n'), 'lead_validation_errors.csv');
+}
+
+// Rejection template: one row per rejected lead, original columns preserved,
+// "Reason" column prepended — matches the MaSH rejection export format.
+function downloadRejectionTemplate(headers, rejectedRows) {
+  const cols = ['Reason', ...headers];
+  const rows = [cols.map(csvCell).join(',')];
+  rejectedRows.forEach(({ rawRow, reasons }) => {
+    const reason = reasons.join(' | ');
+    // pad rawRow to header length in case some rows are shorter
+    const padded = headers.map((_, i) => rawRow[i] !== undefined ? rawRow[i] : '');
+    rows.push([csvCell(reason), ...padded.map(csvCell)].join(','));
+  });
+  triggerDownload(rows.join('\n'), 'rejected_leads.csv');
+}
+
+function triggerDownload(csvContent, filename) {
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+function selectTargetSheet(workbook) {
+  const target = RULES.TARGET_SHEET_NAME.trim().toLowerCase();
+  const matchName = workbook.SheetNames.find(name => name.trim().toLowerCase() === target);
+  if (matchName) {
+    return { sheetName: matchName, usedFallback: false };
+  }
+  return { sheetName: workbook.SheetNames[0], usedFallback: true };
+}
+
+function handleFile(file) {
+  if (!file) {
+    setStatus('No file selected.', 'error');
+    return;
+  }
+  const ext = file.name.split('.').pop().toLowerCase();
+  setStatus(`<i class="ti ti-loader"></i> Reading <b>${escapeHtml(file.name)}</b>...`, 'info');
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = ext === 'csv'
+        ? XLSX.read(e.target.result, { type: 'string' })
+        : XLSX.read(e.target.result, { type: 'array' });
+
+      const { sheetName, usedFallback } = selectTargetSheet(wb);
+      const ws = wb.Sheets[sheetName];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+      const result = Validator.validateLeadData(data);
+      if (result.emptyFile) {
+        setStatus('File appears empty or has no data rows.', 'error');
+        return;
+      }
+
+      if (usedFallback) {
+        result.sheetWarning = `No sheet named "${RULES.TARGET_SHEET_NAME}" was found — validated the first sheet ("${sheetName}") instead.`;
+      } else {
+        result.sheetWarning = null;
+      }
+      result.sheetName = sheetName;
+      renderResults(result);
+    } catch (err) {
+      console.error(err);
+      setStatus('Could not read file. Make sure it is a valid .xlsx or .csv.', 'error');
+    }
+  };
+
+  if (ext === 'csv') reader.readAsText(file);
+  else reader.readAsArrayBuffer(file);
+}
+
+// --- Event wiring ---
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileIn');
+
+  document.getElementById('browseLink').addEventListener('click', (e) => {
+    e.stopPropagation();
+    fileInput.click();
+  });
+  fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+  dz.addEventListener('click', () => fileInput.click());
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.classList.remove('drag');
+    handleFile(e.dataTransfer.files[0]);
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', resetTool);
+});
+
+</script>
+</body>
+</html>

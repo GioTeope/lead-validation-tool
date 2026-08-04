@@ -23,7 +23,8 @@ const SCRUBBED_EMAILS = [
 const BLOCKED_DOMAINS = [
   'test.com',
   'marketo.in',
-  'microsoft.com'
+  'microsoft.com',
+  'example.com'
 ];
 
 // Company name values that indicate scrubbed / invalid / placeholder data.

@@ -21,7 +21,7 @@ function resetTool() {
   document.getElementById('dropZone').style.display = '';
 }
 
-function renderResults({ checked, errors, sheetName, sheetWarning }) {
+function renderResults({ checked, errors, headers, rejectedRows, sheetName, sheetWarning }) {
   const errorRowCount = new Set(errors.map(e => e.row)).size;
   const cleanRows = checked - errorRowCount;
 
@@ -59,32 +59,52 @@ function renderResults({ checked, errors, sheetName, sheetWarning }) {
       </tr>`).join('');
   }
 
-  document.getElementById('dlBtn').onclick = () => downloadCsv(errors);
+  document.getElementById('dlBtn').onclick = () => downloadErrorReport(errors);
+  document.getElementById('dlRejBtn').onclick = () => downloadRejectionTemplate(headers, rejectedRows);
 }
 
 function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function downloadCsv(errors) {
-  const header = ['Row', 'Field', 'Value', 'Issue'];
+function csvCell(val) {
+  const s = val === null || val === undefined ? '' : String(val);
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+// Original error report: one row per issue (Row / Field / Value / Issue)
+function downloadErrorReport(errors) {
+  const header = ['Row', 'Field', 'Value Found', 'Issue'];
   const rows = [header.join(',')];
   if (errors.length === 0) {
     rows.push('No errors found.');
   } else {
     errors.forEach(e => {
-      rows.push([
-        e.row,
-        `"${e.field}"`,
-        `"${String(e.value).replace(/"/g, '""')}"`,
-        `"${e.issue}"`
-      ].join(','));
+      rows.push([e.row, csvCell(e.field), csvCell(e.value), csvCell(e.issue)].join(','));
     });
   }
-  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+  triggerDownload(rows.join('\n'), 'lead_validation_errors.csv');
+}
+
+// Rejection template: one row per rejected lead, original columns preserved,
+// "Reason" column prepended — matches the MaSH rejection export format.
+function downloadRejectionTemplate(headers, rejectedRows) {
+  const cols = ['Reason', ...headers];
+  const rows = [cols.map(csvCell).join(',')];
+  rejectedRows.forEach(({ rawRow, reasons }) => {
+    const reason = reasons.join(' | ');
+    // pad rawRow to header length in case some rows are shorter
+    const padded = headers.map((_, i) => rawRow[i] !== undefined ? rawRow[i] : '');
+    rows.push([csvCell(reason), ...padded.map(csvCell)].join(','));
+  });
+  triggerDownload(rows.join('\n'), 'rejected_leads.csv');
+}
+
+function triggerDownload(csvContent, filename) {
+  const blob = new Blob([csvContent], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'lead_validation_errors.csv';
+  a.download = filename;
   a.click();
 }
 
