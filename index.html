@@ -49,6 +49,29 @@
   </footer>
 </div>
 
+<!-- Step 2: Dashboard cleanup (shown after validation if there are rejected leads) -->
+<div id="step2Section" class="step2-wrap" style="display:none">
+  <div class="step2-header">
+    <span class="step2-badge">Step 2</span>
+    <div>
+      <h2>Clean dashboard export</h2>
+      <p>Upload your UTF-8 dashboard <code>.txt</code> file — <b id="step2Count">0</b> rejected email(s) will be removed automatically.</p>
+    </div>
+  </div>
+  <div id="dropZone2" class="drop-zone">
+    <i class="ti ti-file-text" aria-hidden="true"></i>
+    <p><b>Drop your dashboard .txt file here</b></p>
+    <p style="margin-top:6px">or <span class="link" id="browseLink2">browse to upload</span></p>
+    <p class="hint">UTF-8 tab-separated .txt files only</p>
+  </div>
+  <input type="file" id="fileIn2" accept=".txt">
+  <div id="step2Status" class="status-bar" style="display:none"></div>
+  <div id="step2Actions" class="actions" style="display:none">
+    <button class="btn primary" id="dlCleanBtn"><i class="ti ti-circle-check" aria-hidden="true"></i> Download cleaned file (.txt)</button>
+    <button class="btn" id="dlRemovedBtn"><i class="ti ti-trash" aria-hidden="true"></i> Download removed rows (.txt)</button>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="src/rules.js"></script>
 <script src="src/country-language-data.js"></script>

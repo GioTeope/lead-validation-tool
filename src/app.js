@@ -19,6 +19,12 @@ function resetTool() {
   document.getElementById('statusBar').style.display = 'none';
   document.getElementById('fileIn').value = '';
   document.getElementById('dropZone').style.display = '';
+  // Reset Step 2
+  document.getElementById('step2Section').style.display = 'none';
+  document.getElementById('step2Status').style.display = 'none';
+  document.getElementById('step2Actions').style.display = 'none';
+  document.getElementById('fileIn2').value = '';
+  _rejectedEmailSet = new Set();
 }
 
 function renderResults({ checked, errors, headers, rejectedRows, sheetName, sheetWarning }) {
@@ -59,8 +65,14 @@ function renderResults({ checked, errors, headers, rejectedRows, sheetName, shee
       </tr>`).join('');
   }
 
-  document.getElementById('dlBtn').onclick = () => downloadErrorReport(errors);
-  document.getElementById('dlRejBtn').onclick = () => downloadRejectionTemplate(headers, rejectedRows);
+  document.getElementById('dlBtn').onclick = (e) => downloadErrorReport(errors, e.currentTarget);
+  document.getElementById('dlRejBtn').onclick = (e) => downloadRejectionTemplate(headers, rejectedRows, e.currentTarget);
+
+  // Reveal Step 2 if there are rejected leads to clean up
+  if (rejectedRows.size > 0) {
+    document.getElementById('step2Section').style.display = 'block';
+    document.getElementById('step2Count').textContent = rejectedRows.size;
+  }
 }
 
 function escapeHtml(str) {
@@ -72,40 +84,121 @@ function csvCell(val) {
   return `"${s.replace(/"/g, '""')}"`;
 }
 
-// Original error report: one row per issue (Row / Field / Value / Issue)
-function downloadErrorReport(errors) {
-  const header = ['Row', 'Field', 'Value Found', 'Issue'];
-  const rows = [header.join(',')];
-  if (errors.length === 0) {
-    rows.push('No errors found.');
-  } else {
-    errors.forEach(e => {
-      rows.push([e.row, csvCell(e.field), csvCell(e.value), csvCell(e.issue)].join(','));
-    });
-  }
-  triggerDownload(rows.join('\n'), 'lead_validation_errors.csv');
-}
+// ── Format picker modal ──────────────────────────────────────────────────────
+// Shows a small inline picker (CSV / Excel / TXT) and calls back with the
+// chosen format so the caller can produce the right file.
 
-// Rejection template: one row per rejected lead, original columns preserved,
-// "Reason" column prepended — matches the MaSH rejection export format.
-function downloadRejectionTemplate(headers, rejectedRows) {
-  const cols = ['Reason', ...headers];
-  const rows = [cols.map(csvCell).join(',')];
-  rejectedRows.forEach(({ rawRow, reasons }) => {
-    const reason = reasons.join(' | ');
-    // pad rawRow to header length in case some rows are shorter
-    const padded = headers.map((_, i) => rawRow[i] !== undefined ? rawRow[i] : '');
-    rows.push([csvCell(reason), ...padded.map(csvCell)].join(','));
+function showFormatPicker(anchorBtn, callback) {
+  // Remove any existing picker
+  const existing = document.getElementById('formatPicker');
+  if (existing) { existing.remove(); if (existing._anchor === anchorBtn) return; }
+
+  const picker = document.createElement('div');
+  picker.id = 'formatPicker';
+  picker._anchor = anchorBtn;
+  picker.style.cssText = `
+    position:absolute; background:var(--surface-2); border:1px solid var(--border-strong);
+    border-radius:var(--radius); box-shadow:0 4px 16px rgba(0,0,0,.12);
+    padding:6px; display:flex; flex-direction:column; gap:4px; z-index:999;
+    min-width:160px; font-family:inherit;
+  `;
+
+  const formats = [
+    { label: '📊  Excel (.xlsx)', fmt: 'xlsx' },
+    { label: '📄  CSV (.csv)',    fmt: 'csv'  },
+    { label: '📝  Text (.txt)',   fmt: 'txt'  },
+  ];
+
+  formats.forEach(({ label, fmt }) => {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.style.cssText = `
+      text-align:left; padding:7px 12px; border:none; background:none;
+      border-radius:6px; cursor:pointer; font-size:13px; color:var(--text-primary);
+      font-family:inherit;
+    `;
+    btn.onmouseover = () => btn.style.background = 'var(--surface-1)';
+    btn.onmouseout  = () => btn.style.background = 'none';
+    btn.onclick = () => { picker.remove(); callback(fmt); };
+    picker.appendChild(btn);
   });
-  triggerDownload(rows.join('\n'), 'rejected_leads.csv');
+
+  // Position below the anchor button
+  document.body.appendChild(picker);
+  const rect = anchorBtn.getBoundingClientRect();
+  picker.style.top  = (window.scrollY + rect.bottom + 6) + 'px';
+  picker.style.left = (window.scrollX + rect.left) + 'px';
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function close(e) {
+      if (!picker.contains(e.target)) { picker.remove(); document.removeEventListener('click', close); }
+    });
+  }, 0);
 }
 
-function triggerDownload(csvContent, filename) {
-  const blob = new Blob([csvContent], { type: 'text/csv' });
+// ── Download helpers ─────────────────────────────────────────────────────────
+
+function buildTabDelimited(headers, dataRows) {
+  return [headers.join('\t'), ...dataRows.map(r => r.join('\t'))].join('\n');
+}
+
+function buildCsv(headers, dataRows) {
+  return [
+    headers.map(csvCell).join(','),
+    ...dataRows.map(r => r.map(csvCell).join(','))
+  ].join('\n');
+}
+
+function buildXlsx(headers, dataRows) {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  return XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+}
+
+function triggerDownload(content, filename, isArray) {
+  const mime = isArray
+    ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    : 'text/plain';
+  const blob = new Blob([content], { type: mime });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename;
   a.click();
+}
+
+function exportFile(fmt, baseName, headers, dataRows) {
+  if (fmt === 'xlsx') {
+    triggerDownload(buildXlsx(headers, dataRows), baseName + '.xlsx', true);
+  } else if (fmt === 'txt') {
+    triggerDownload(buildTabDelimited(headers, dataRows), baseName + '.txt', false);
+  } else {
+    triggerDownload(buildCsv(headers, dataRows), baseName + '.csv', false);
+  }
+}
+
+// ── Error report: one row per issue ─────────────────────────────────────────
+function downloadErrorReport(errors, anchorBtn) {
+  const headers = ['Row', 'Field', 'Value Found', 'Issue'];
+  const dataRows = errors.length === 0
+    ? [['—', '—', '—', 'No errors found']]
+    : errors.map(e => [String(e.row), e.field, String(e.value), e.issue]);
+
+  showFormatPicker(anchorBtn, fmt => exportFile(fmt, 'lead_validation_errors', headers, dataRows));
+}
+
+// ── Rejection template: one row per rejected lead ────────────────────────────
+function downloadRejectionTemplate(fileHeaders, rejectedRows, anchorBtn) {
+  const headers = ['Reason', ...fileHeaders];
+  const dataRows = [];
+  rejectedRows.forEach(({ rawRow, reasons }) => {
+    const reason = reasons.join(' | ');
+    const padded = fileHeaders.map((_, i) => rawRow[i] !== undefined ? String(rawRow[i]) : '');
+    dataRows.push([reason, ...padded]);
+  });
+
+  showFormatPicker(anchorBtn, fmt => exportFile(fmt, 'rejected_leads', headers, dataRows));
 }
 
 function selectTargetSheet(workbook) {
@@ -116,6 +209,9 @@ function selectTargetSheet(workbook) {
   }
   return { sheetName: workbook.SheetNames[0], usedFallback: true };
 }
+
+// Stores the set of rejected emails after Step 1 — used in Step 2
+let _rejectedEmailSet = new Set();
 
 function handleFile(file) {
   if (!file) {
@@ -148,6 +244,18 @@ function handleFile(file) {
         result.sheetWarning = null;
       }
       result.sheetName = sheetName;
+
+      // Build rejected email set for Step 2
+      _rejectedEmailSet = new Set();
+      result.rejectedRows.forEach(({ rawRow }) => {
+        const emailIdx = result.headers.findIndex(h =>
+          RULES.COLUMN_ALIASES.email.some(a => a.toLowerCase() === h.toLowerCase())
+        );
+        if (emailIdx > -1 && rawRow[emailIdx]) {
+          _rejectedEmailSet.add(rawRow[emailIdx].toString().trim().toLowerCase());
+        }
+      });
+
       renderResults(result);
     } catch (err) {
       console.error(err);
@@ -158,6 +266,172 @@ function handleFile(file) {
   if (ext === 'csv') reader.readAsText(file);
   else reader.readAsArrayBuffer(file);
 }
+
+// ── Step 2: Dashboard UTF-8 .txt cleanup ────────────────────────────────────
+
+function parseTsv(text) {
+  const lines = text.split(/\r?\n/);
+  return lines.map(l => l.split('\t'));
+}
+
+function setStep2Status(msg, type) {
+  const bar = document.getElementById('step2Status');
+  bar.style.display = 'block';
+  bar.className = 'status-bar ' + type;
+  bar.innerHTML = msg;
+}
+
+function handleDashboardFile(file) {
+  if (!file) return;
+
+  // Hide previous results
+  document.getElementById('step2Actions').style.display = 'none';
+  setStep2Status(`<i class="ti ti-loader"></i> Reading <b>${escapeHtml(file.name)}</b>...`, 'info');
+
+  // Guard: Step 1 must have been run first
+  if (_rejectedEmailSet.size === 0) {
+    setStep2Status('No rejected leads found from Step 1. Please validate a lead file first.', 'error');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const text = e.target.result;
+
+      // ── Check 1: File is not empty
+      if (!text || text.trim().length === 0) {
+        setStep2Status('The uploaded file is empty.', 'error');
+        return;
+      }
+
+      // ── Check 2: Looks tab-separated (not comma or pipe)
+      const firstLine = text.split(/\r?\n/)[0];
+      const tabCount   = (firstLine.match(/\t/g) || []).length;
+      const commaCount = (firstLine.match(/,/g) || []).length;
+      const pipeCount  = (firstLine.match(/\|/g) || []).length;
+      if (tabCount === 0) {
+        const likely = commaCount > 0 ? 'comma-separated (.csv)' : pipeCount > 0 ? 'pipe-separated' : 'unrecognised';
+        setStep2Status(
+          `This file does not appear to be tab-separated — it looks like a <b>${likely}</b> file. ` +
+          `Please export the dashboard file as a tab-separated .txt.`,
+          'error'
+        );
+        return;
+      }
+
+      const rows = parseTsv(text);
+      const dataRows = rows.slice(1).filter(r => r.some(c => (c || '').trim() !== ''));
+
+      // ── Check 3: Has data rows
+      if (dataRows.length === 0) {
+        setStep2Status('The file has a header row but no data rows.', 'error');
+        return;
+      }
+
+      const headers = rows[0].map(h => (h || '').trim());
+
+      // ── Check 4: Has an email column
+      const emailIdx = headers.findIndex(h =>
+        RULES.COLUMN_ALIASES.email.some(a => a.toLowerCase() === h.toLowerCase())
+      );
+      if (emailIdx === -1) {
+        setStep2Status(
+          `Could not find an email column in this file. ` +
+          `Headers found: <b>${escapeHtml(headers.filter(Boolean).join(', '))}</b>. ` +
+          `Expected a column named "Email Address" or "Email".`,
+          'error'
+        );
+        return;
+      }
+
+      // ── Split into clean / removed
+      const cleanRows   = [];
+      const removedRows = [];
+      const dashboardEmails = new Set();
+
+      dataRows.forEach(row => {
+        const email = ((row[emailIdx] || '')).toString().trim().toLowerCase();
+        if (email) dashboardEmails.add(email);
+        if (_rejectedEmailSet.has(email)) {
+          removedRows.push(row);
+        } else {
+          cleanRows.push(row);
+        }
+      });
+
+      // ── Check 5: Zero matches — likely wrong file
+      if (removedRows.length === 0) {
+        const rejectedList = [..._rejectedEmailSet].slice(0, 3).join(', ');
+        setStep2Status(
+          `<b>Warning — no rejected leads were found in this file.</b><br>` +
+          `None of the ${_rejectedEmailSet.size} rejected email(s) from Step 1 appear in this dashboard export. ` +
+          `This may mean you uploaded the wrong file.<br>` +
+          `<small>Looking for: ${escapeHtml(rejectedList)}${_rejectedEmailSet.size > 3 ? '…' : ''}</small>`,
+          'error'
+        );
+        return;
+      }
+
+      // ── Check 6: Partial match warning — some rejected emails not found in dashboard
+      const notFoundInDashboard = [..._rejectedEmailSet].filter(e => !dashboardEmails.has(e));
+      const partialWarning = notFoundInDashboard.length > 0
+        ? `<br><small>⚠️ <b>${notFoundInDashboard.length}</b> rejected email(s) from Step 1 were not found in this file ` +
+          `(they may already have been removed or belong to a different export): ` +
+          `${escapeHtml(notFoundInDashboard.slice(0, 3).join(', '))}${notFoundInDashboard.length > 3 ? '…' : ''}</small>`
+        : '';
+
+      // ── Check 7: Row count sanity — dashboard file has far fewer rows than lead file
+      // (Only warn, don't block — dashboard may legitimately have different counts)
+      const step1Count = parseInt(document.getElementById('summaryGrid')
+        ?.querySelector('.metric .val')?.textContent || '0', 10);
+      const countWarning = (step1Count > 0 && dataRows.length < step1Count * 0.5)
+        ? `<br><small>⚠️ This file has <b>${dataRows.length}</b> rows but the lead file had <b>${step1Count}</b> — ` +
+          `double-check this is the correct dashboard export.</small>`
+        : '';
+
+      // ── All checks passed — show results
+      setStep2Status(
+        `✓ Done — <b>${dataRows.length}</b> rows processed. ` +
+        `<b>${removedRows.length}</b> rejected lead(s) removed. ` +
+        `<b>${cleanRows.length}</b> clean rows remaining.` +
+        partialWarning + countWarning,
+        removedRows.length > 0 && notFoundInDashboard.length === 0 ? 'success' : 'info'
+      );
+
+      document.getElementById('step2Actions').style.display = 'flex';
+
+      document.getElementById('dlCleanBtn').onclick = () => {
+        const content = [headers, ...cleanRows].map(r => r.join('\t')).join('\n');
+        const blob = new Blob(['\uFEFF' + content], { type: 'text/plain;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'dashboard_cleaned.txt';
+        a.click();
+      };
+
+      document.getElementById('dlRemovedBtn').onclick = () => {
+        const content = [headers, ...removedRows].map(r => r.join('\t')).join('\n');
+        const blob = new Blob(['\uFEFF' + content], { type: 'text/plain;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'dashboard_removed.txt';
+        a.click();
+      };
+
+    } catch (err) {
+      console.error(err);
+      setStep2Status('Could not read file. Make sure it is a valid UTF-8 .txt file.', 'error');
+    }
+  };
+
+  reader.onerror = () => {
+    setStep2Status('Failed to read the file — it may be locked or corrupted.', 'error');
+  };
+
+  reader.readAsText(file, 'UTF-8');
+}
+
 
 // --- Event wiring ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -180,4 +454,22 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('resetBtn').addEventListener('click', resetTool);
+
+  // Step 2 wiring
+  const dz2 = document.getElementById('dropZone2');
+  const fileInput2 = document.getElementById('fileIn2');
+
+  document.getElementById('browseLink2').addEventListener('click', (e) => {
+    e.stopPropagation();
+    fileInput2.click();
+  });
+  fileInput2.addEventListener('change', e => handleDashboardFile(e.target.files[0]));
+  dz2.addEventListener('click', () => fileInput2.click());
+  dz2.addEventListener('dragover', e => { e.preventDefault(); dz2.classList.add('drag'); });
+  dz2.addEventListener('dragleave', () => dz2.classList.remove('drag'));
+  dz2.addEventListener('drop', e => {
+    e.preventDefault();
+    dz2.classList.remove('drag');
+    handleDashboardFile(e.dataTransfer.files[0]);
+  });
 });
