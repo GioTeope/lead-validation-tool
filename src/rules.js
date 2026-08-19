@@ -141,7 +141,8 @@ const BAD_JOB_TITLES = [
 // in the value (case-insensitive) — catches variations not in the exact
 // list above, e.g. "Part-time Student Worker" or "Student Ambassador".
 const BAD_JOB_TITLE_KEYWORDS = [
-  'student'
+  'student',
+  'freelance'
 ];
 
 // Name of the sheet in MaSH lead upload files that should be validated.

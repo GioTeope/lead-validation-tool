@@ -1,11 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lead File Validator — MaSH</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-<style>:root {
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Lead File Validator — MaSH</title><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"><style>:root {
   --bg: #ffffff;
   --text-primary: #1a1a1a;
   --text-secondary: #4a4a4a;
@@ -107,9 +100,7 @@ input[type="file"] { display: none; }
 .step2-header h2 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
 .step2-header p { font-size: 14px; color: var(--text-secondary); }
 .step2-badge { flex-shrink: 0; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 20px; margin-top: 3px; letter-spacing: .04em; }
-</style>
-</head>
-<body>
+</style></head><body>
 <div class="wrap">
   <header class="page-header">
     <h1>Lead File Validator</h1>
@@ -174,9 +165,6 @@ input[type="file"] { display: none; }
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
-// ═══════════════════════════════════════════════════════════════════
-// ── RULES ──
-// ═══════════════════════════════════════════════════════════════════
 // Exact email addresses that are known to be scrubbed / placeholder /
 // blacklisted leads. Only these specific addresses are blocked — the
 // domains they belong to (hotmail.com, amazon.com, etc.) are NOT blocked.
@@ -311,7 +299,8 @@ const BAD_JOB_TITLES = [
 // in the value (case-insensitive) — catches variations not in the exact
 // list above, e.g. "Part-time Student Worker" or "Student Ambassador".
 const BAD_JOB_TITLE_KEYWORDS = [
-  'student'
+  'student',
+  'freelance'
 ];
 
 // Name of the sheet in MaSH lead upload files that should be validated.
@@ -343,9 +332,6 @@ window.RULES = {
   COLUMN_ALIASES
 };
 
-// ═══════════════════════════════════════════════════════════════════
-// ── REFERENCE DATA ──
-// ═══════════════════════════════════════════════════════════════════
 // Each entry: { name: "Display Name", code: "XX" }
 const COUNTRIES = [
   { name: "Afghanistan", code: "AF" },
@@ -676,9 +662,6 @@ const LANGUAGES = [
 
 window.REFERENCE_DATA = { COUNTRIES, LANGUAGES };
 
-// ═══════════════════════════════════════════════════════════════════
-// ── VALIDATOR ──
-// ═══════════════════════════════════════════════════════════════════
 function normalizeHeader(h) {
   if (!h) return '';
   return h.toString().trim().toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -925,9 +908,6 @@ function validateLeadData(data) {
 
 window.Validator = { validateLeadData };
 
-// ═══════════════════════════════════════════════════════════════════
-// ── APP ──
-// ═══════════════════════════════════════════════════════════════════
 function setStatus(msg, type) {
   const bar = document.getElementById('statusBar');
   bar.style.display = 'block';
@@ -1396,5 +1376,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 </script>
-</body>
-</html>
+</body></html>
