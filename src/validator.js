@@ -213,11 +213,13 @@ function validateLeadData(data) {
     lastName: findColumn(headers, cols.lastName),
     jobTitle: findColumn(headers, cols.jobTitle),
     country: findColumn(headers, cols.country),
-    language: findColumn(headers, cols.language)
+    language: findColumn(headers, cols.language),
+    programStatus: findColumn(headers, cols.programStatus)
   };
 
   const errors = [];
   const rejectedRows = new Map();
+  const programStatusCounts = {};  // { "Registered": 12, "Attended": 8, ... }
   let checked = 0;
 
   rows.forEach((row, i) => {
@@ -226,10 +228,15 @@ function validateLeadData(data) {
     if (!hasData) return;
     checked++;
 
+    // Count Program Status values
+    if (colIdx.programStatus > -1) {
+      const val = (row[colIdx.programStatus] || '').toString().trim() || '(blank)';
+      programStatusCounts[val] = (programStatusCounts[val] || 0) + 1;
+    }
+
     const pushIfBad = (result, field, value, type) => {
       if (!result.ok) {
         errors.push({ row: rowNum, field, value: value || '(blank)', issue: result.msg, type });
-        // also collect into rejectedRows for the template export
         if (!rejectedRows.has(rowNum)) {
           rejectedRows.set(rowNum, { rawRow: row, reasons: [] });
         }
@@ -246,7 +253,7 @@ function validateLeadData(data) {
     if (colIdx.language > -1) pushIfBad(isValidLanguage(row[colIdx.language]), 'Language', row[colIdx.language], 'other');
   });
 
-  return { checked, errors, headers, rejectedRows, emptyFile: false };
+  return { checked, errors, headers, rejectedRows, programStatusCounts, emptyFile: false };
 }
 
 // Browser-global export (no bundler in this lightweight tool)

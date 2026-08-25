@@ -100,6 +100,15 @@ input[type="file"] { display: none; }
 .step2-header h2 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
 .step2-header p { font-size: 14px; color: var(--text-secondary); }
 .step2-badge { flex-shrink: 0; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 20px; margin-top: 3px; letter-spacing: .04em; }
+
+/* ── Program Status breakdown ── */
+.ps-list { display: flex; flex-direction: column; gap: 6px; }
+.ps-row { display: grid; grid-template-columns: 140px 1fr 50px 40px; align-items: center; gap: 8px; font-size: 13px; }
+.ps-label { color: var(--text-primary); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps-bar-wrap { background: var(--border); border-radius: 4px; height: 8px; overflow: hidden; }
+.ps-bar { display: block; height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s; }
+.ps-count { text-align: right; font-weight: 600; color: var(--text-primary); }
+.ps-pct { text-align: right; color: var(--text-muted); font-size: 12px; }
 </style></head><body>
 <div class="wrap">
   <header class="page-header">
@@ -120,6 +129,7 @@ input[type="file"] { display: none; }
   <div id="results" style="display:none">
     <div id="sheetNote"></div>
     <div class="summary-grid" id="summaryGrid"></div>
+    <div id="programStatusBreakdown" style="display:none"></div>
     <div class="section">
       <h3>Validation errors</h3>
       <div style="overflow-x:auto">
@@ -268,7 +278,9 @@ const SCRUBBED_COMPANY_KEYWORDS = [
   'estudiante',
   'trabajador-independiente',
   'trabajador independiente',
-  'student'
+  'student',
+  'self learner',
+  'self-learner'
 ];
 
 // Patterns that mean the company name is just symbols/punctuation with no
@@ -300,7 +312,9 @@ const BAD_JOB_TITLES = [
 // list above, e.g. "Part-time Student Worker" or "Student Ambassador".
 const BAD_JOB_TITLE_KEYWORDS = [
   'student',
-  'freelance'
+  'freelance',
+  'self learner',
+  'self-learner'
 ];
 
 // Name of the sheet in MaSH lead upload files that should be validated.
@@ -316,7 +330,8 @@ const COLUMN_ALIASES = {
   lastName: ['Last Name', 'LastName'],
   jobTitle: ['Job Title', 'JobTitle'],
   country: ['Country'],
-  language: ['Language']
+  language: ['Language'],
+  programStatus: ['Program Status', 'ProgramStatus', 'Program_Status']
 };
 
 // Exported for use in validator.js / app.js (browser-global, no bundler needed)
@@ -868,11 +883,13 @@ function validateLeadData(data) {
     lastName: findColumn(headers, cols.lastName),
     jobTitle: findColumn(headers, cols.jobTitle),
     country: findColumn(headers, cols.country),
-    language: findColumn(headers, cols.language)
+    language: findColumn(headers, cols.language),
+    programStatus: findColumn(headers, cols.programStatus)
   };
 
   const errors = [];
   const rejectedRows = new Map();
+  const programStatusCounts = {};  // { "Registered": 12, "Attended": 8, ... }
   let checked = 0;
 
   rows.forEach((row, i) => {
@@ -881,10 +898,15 @@ function validateLeadData(data) {
     if (!hasData) return;
     checked++;
 
+    // Count Program Status values
+    if (colIdx.programStatus > -1) {
+      const val = (row[colIdx.programStatus] || '').toString().trim() || '(blank)';
+      programStatusCounts[val] = (programStatusCounts[val] || 0) + 1;
+    }
+
     const pushIfBad = (result, field, value, type) => {
       if (!result.ok) {
         errors.push({ row: rowNum, field, value: value || '(blank)', issue: result.msg, type });
-        // also collect into rejectedRows for the template export
         if (!rejectedRows.has(rowNum)) {
           rejectedRows.set(rowNum, { rawRow: row, reasons: [] });
         }
@@ -901,7 +923,7 @@ function validateLeadData(data) {
     if (colIdx.language > -1) pushIfBad(isValidLanguage(row[colIdx.language]), 'Language', row[colIdx.language], 'other');
   });
 
-  return { checked, errors, headers, rejectedRows, emptyFile: false };
+  return { checked, errors, headers, rejectedRows, programStatusCounts, emptyFile: false };
 }
 
 
@@ -920,6 +942,7 @@ function resetTool() {
   document.getElementById('statusBar').style.display = 'none';
   document.getElementById('fileIn').value = '';
   document.getElementById('dropZone').style.display = '';
+  document.getElementById('programStatusBreakdown').style.display = 'none';
   // Reset Step 2
   document.getElementById('step2Section').style.display = 'none';
   document.getElementById('step2Status').style.display = 'none';
@@ -928,7 +951,7 @@ function resetTool() {
   _rejectedEmailSet = new Set();
 }
 
-function renderResults({ checked, errors, headers, rejectedRows, sheetName, sheetWarning }) {
+function renderResults({ checked, errors, headers, rejectedRows, programStatusCounts, sheetName, sheetWarning }) {
   const errorRowCount = new Set(errors.map(e => e.row)).size;
   const cleanRows = checked - errorRowCount;
 
@@ -952,6 +975,26 @@ function renderResults({ checked, errors, headers, rejectedRows, sheetName, shee
     <div class="metric bad"><div class="label">Rows with errors</div><div class="val">${errorRowCount}</div></div>
     <div class="metric warn"><div class="label">Total issues</div><div class="val">${errors.length}</div></div>
   `;
+
+  // Program Status breakdown
+  const psEl = document.getElementById('programStatusBreakdown');
+  const psCount = Object.keys(programStatusCounts || {}).length;
+  if (psCount > 0) {
+    // Sort by count descending
+    const sorted = Object.entries(programStatusCounts).sort((a, b) => b[1] - a[1]);
+    const rows = sorted.map(([status, count]) => `
+      <div class="ps-row">
+        <span class="ps-label">${escapeHtml(status)}</span>
+        <span class="ps-bar-wrap"><span class="ps-bar" style="width:${Math.round(count/checked*100)}%"></span></span>
+        <span class="ps-count">${count.toLocaleString()}</span>
+        <span class="ps-pct">${Math.round(count/checked*100)}%</span>
+      </div>`).join('');
+    psEl.innerHTML = `<div class="section"><h3>Program Status breakdown</h3><div class="ps-list">${rows}</div></div>`;
+    psEl.style.display = 'block';
+  } else {
+    psEl.style.display = 'none';
+    psEl.innerHTML = '';
+  }
 
   const tbody = document.getElementById('errBody');
   if (errors.length === 0) {

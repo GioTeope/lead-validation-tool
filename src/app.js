@@ -19,6 +19,7 @@ function resetTool() {
   document.getElementById('statusBar').style.display = 'none';
   document.getElementById('fileIn').value = '';
   document.getElementById('dropZone').style.display = '';
+  document.getElementById('programStatusBreakdown').style.display = 'none';
   // Reset Step 2
   document.getElementById('step2Section').style.display = 'none';
   document.getElementById('step2Status').style.display = 'none';
@@ -27,7 +28,7 @@ function resetTool() {
   _rejectedEmailSet = new Set();
 }
 
-function renderResults({ checked, errors, headers, rejectedRows, sheetName, sheetWarning }) {
+function renderResults({ checked, errors, headers, rejectedRows, programStatusCounts, sheetName, sheetWarning }) {
   const errorRowCount = new Set(errors.map(e => e.row)).size;
   const cleanRows = checked - errorRowCount;
 
@@ -51,6 +52,26 @@ function renderResults({ checked, errors, headers, rejectedRows, sheetName, shee
     <div class="metric bad"><div class="label">Rows with errors</div><div class="val">${errorRowCount}</div></div>
     <div class="metric warn"><div class="label">Total issues</div><div class="val">${errors.length}</div></div>
   `;
+
+  // Program Status breakdown
+  const psEl = document.getElementById('programStatusBreakdown');
+  const psCount = Object.keys(programStatusCounts || {}).length;
+  if (psCount > 0) {
+    // Sort by count descending
+    const sorted = Object.entries(programStatusCounts).sort((a, b) => b[1] - a[1]);
+    const rows = sorted.map(([status, count]) => `
+      <div class="ps-row">
+        <span class="ps-label">${escapeHtml(status)}</span>
+        <span class="ps-bar-wrap"><span class="ps-bar" style="width:${Math.round(count/checked*100)}%"></span></span>
+        <span class="ps-count">${count.toLocaleString()}</span>
+        <span class="ps-pct">${Math.round(count/checked*100)}%</span>
+      </div>`).join('');
+    psEl.innerHTML = `<div class="section"><h3>Program Status breakdown</h3><div class="ps-list">${rows}</div></div>`;
+    psEl.style.display = 'block';
+  } else {
+    psEl.style.display = 'none';
+    psEl.innerHTML = '';
+  }
 
   const tbody = document.getElementById('errBody');
   if (errors.length === 0) {
