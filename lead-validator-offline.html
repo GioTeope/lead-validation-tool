@@ -762,16 +762,30 @@ function levenshtein(a, b) {
 
 function fuzzyMatchesBlocklist(value) {
   const s = stripAccents(value.toString().toLowerCase().trim());
+  // Split into individual words to avoid matching substrings inside longer words
+  // e.g. "investment" containing "stment" should NOT match "student"
+  const words = s.split(/[\s\/\-,]+/).filter(Boolean);
+
   for (const kw of FUZZY_BLOCKLIST) {
     const threshold = kw.length <= 6 ? 1 : 2;
-    // Check full value against keyword
-    if (levenshtein(s, kw) <= threshold) return kw;
-    // Sliding-window check for values longer than the keyword
-    // (e.g. "Freelamce Consultant" — check the "freelamce" segment)
-    if (s.length > kw.length) {
-      for (let i = 0; i <= s.length - kw.length + threshold; i++) {
-        const slice = s.slice(i, i + kw.length);
-        if (slice.length >= kw.length - threshold && levenshtein(slice, kw) <= threshold) return kw;
+    const kwWords = kw.split(/\s+/);
+
+    // Single-word keyword: check each word in the value individually
+    if (kwWords.length === 1) {
+      for (const word of words) {
+        // Only compare words of similar length to avoid "stment" matching "student"
+        // Length must be within (threshold) characters of the keyword
+        if (Math.abs(word.length - kw.length) <= threshold) {
+          if (levenshtein(word, kw) <= threshold) return kw;
+        }
+      }
+    } else {
+      // Multi-word keyword (e.g. "self learner"): check consecutive word pairs
+      for (let i = 0; i <= words.length - kwWords.length; i++) {
+        const phrase = words.slice(i, i + kwWords.length).join(' ');
+        if (Math.abs(phrase.length - kw.length) <= threshold * kwWords.length) {
+          if (levenshtein(phrase, kw) <= threshold * kwWords.length) return kw;
+        }
       }
     }
   }
