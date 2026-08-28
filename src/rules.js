@@ -112,7 +112,13 @@ const SCRUBBED_COMPANY_KEYWORDS = [
   'trabajador independiente',
   'student',
   'self learner',
-  'self-learner'
+  'self-learner',
+  'learner',
+  'independent learner',
+  'independent consultant',
+  'independent contractor',
+  'independiente',
+  'independant'
 ];
 
 // Patterns that mean the company name is just symbols/punctuation with no
@@ -146,7 +152,11 @@ const BAD_JOB_TITLE_KEYWORDS = [
   'student',
   'freelance',
   'self learner',
-  'self-learner'
+  'self-learner',
+  'learner',
+  'independent learner',
+  'independent consultant',
+  'independent contractor'
 ];
 
 // Name of the sheet in MaSH lead upload files that should be validated.
@@ -163,7 +173,8 @@ const COLUMN_ALIASES = {
   jobTitle: ['Job Title', 'JobTitle'],
   country: ['Country'],
   language: ['Language'],
-  programStatus: ['Program Status', 'ProgramStatus', 'Program_Status']
+  programStatus: ['Program Status', 'ProgramStatus', 'Program_Status'],
+  dateColumn: ['Collection Date', 'Date Collected', 'Lead Date', 'Created Date', 'Date', 'Timestamp']
 };
 
 // Exported for use in validator.js / app.js (browser-global, no bundler needed)

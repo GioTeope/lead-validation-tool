@@ -14,12 +14,45 @@ function setStatus(msg, type) {
   bar.innerHTML = msg;
 }
 
+function getComplianceRules() {
+  const prdRef = (document.getElementById('prdRef')?.value || '').trim();
+  const excludedRaw = (document.getElementById('excludedCountries')?.value || '').trim();
+  const dateCutoff = (document.getElementById('dateCutoff')?.value || '').trim();
+  const dateColumnName = (document.getElementById('dateColumnName')?.value || '').trim();
+  const originalNote = (document.getElementById('complianceNote')?.value || '').trim();
+
+  const excludedCountries = excludedRaw
+    ? excludedRaw.split(',').map(c => c.trim()).filter(Boolean)
+    : [];
+
+  const hasRules = prdRef || excludedCountries.length > 0 || dateCutoff || originalNote;
+
+  return hasRules
+    ? { prdRef, excludedCountries, dateCutoff, dateColumnName, originalNote }
+    : null;
+}
+
+function updateComplianceSummary() {
+  const rules = getComplianceRules();
+  const el = document.getElementById('complianceSummary');
+  if (!el) return;
+  if (!rules) { el.style.display = 'none'; return; }
+  const parts = [];
+  if (rules.prdRef) parts.push(`<strong>PRD:</strong> ${escapeHtml(rules.prdRef)}`);
+  if (rules.excludedCountries.length) parts.push(`<strong>Excluded:</strong> ${rules.excludedCountries.map(escapeHtml).join(', ')}`);
+  if (rules.dateCutoff) parts.push(`<strong>DNC cutoff:</strong> ${escapeHtml(rules.dateCutoff)}`);
+  el.innerHTML = '✓ Compliance rules active — ' + parts.join(' &nbsp;·&nbsp; ');
+  el.style.display = parts.length ? 'block' : 'none';
+}
+
 function resetTool() {
   document.getElementById('results').style.display = 'none';
   document.getElementById('statusBar').style.display = 'none';
   document.getElementById('fileIn').value = '';
   document.getElementById('dropZone').style.display = '';
   document.getElementById('programStatusBreakdown').style.display = 'none';
+  const ca = document.getElementById('complianceAudit');
+  if (ca) ca.style.display = 'none';
   // Reset Step 2
   document.getElementById('step2Section').style.display = 'none';
   document.getElementById('step2Status').style.display = 'none';
@@ -28,7 +61,7 @@ function resetTool() {
   _rejectedEmailSet = new Set();
 }
 
-function renderResults({ checked, errors, headers, rejectedRows, programStatusCounts, sheetName, sheetWarning }) {
+function renderResults({ checked, errors, headers, rejectedRows, programStatusCounts, compliance, sheetName, sheetWarning }) {
   const errorRowCount = new Set(errors.map(e => e.row)).size;
   const cleanRows = checked - errorRowCount;
 
@@ -45,6 +78,28 @@ function renderResults({ checked, errors, headers, rejectedRows, programStatusCo
     sheetNote = `<div class="sheet-note">Validated sheet: <b>${escapeHtml(sheetName)}</b></div>`;
   }
   document.getElementById('sheetNote').innerHTML = sheetNote;
+
+  // Compliance audit block
+  const compAuditEl = document.getElementById('complianceAudit');
+  if (compAuditEl) {
+    if (compliance) {
+      const complianceErrors = errors.filter(e => e.type === 'compliance');
+      const lines = [];
+      if (compliance.prdRef) lines.push(`<p><strong>Approval ref:</strong> ${escapeHtml(compliance.prdRef)}</p>`);
+      if (compliance.excludedCountries && compliance.excludedCountries.length)
+        lines.push(`<p><strong>Excluded countries:</strong> ${compliance.excludedCountries.map(escapeHtml).join(', ')}</p>`);
+      if (compliance.dateCutoff)
+        lines.push(`<p><strong>DNC cutoff date:</strong> ${escapeHtml(compliance.dateCutoff)}</p>`);
+      if (complianceErrors.length)
+        lines.push(`<p><strong>Compliance violations:</strong> ${complianceErrors.length} lead(s) flagged</p>`);
+      if (compliance.originalNote)
+        lines.push(`<div class="note-text"><strong>Note:</strong> ${escapeHtml(compliance.originalNote)}</div>`);
+      compAuditEl.innerHTML = `<h4>Compliance rules applied</h4>${lines.join('')}`;
+      compAuditEl.style.display = 'block';
+    } else {
+      compAuditEl.style.display = 'none';
+    }
+  }
 
   document.getElementById('summaryGrid').innerHTML = `
     <div class="metric"><div class="label">Rows checked</div><div class="val">${checked}</div></div>
@@ -253,7 +308,8 @@ function handleFile(file) {
       const ws = wb.Sheets[sheetName];
       const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-      const result = Validator.validateLeadData(data);
+      const compliance = getComplianceRules();
+      const result = Validator.validateLeadData(data, compliance);
       if (result.emptyFile) {
         setStatus('File appears empty or has no data rows.', 'error');
         return;
@@ -475,6 +531,25 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('resetBtn').addEventListener('click', resetTool);
+
+  // Compliance panel toggle
+  const compToggle = document.getElementById('complianceToggle');
+  const compFields = document.getElementById('complianceFields');
+  if (compToggle && compFields) {
+    compToggle.addEventListener('click', () => {
+      const expanded = compToggle.getAttribute('aria-expanded') === 'true';
+      compToggle.setAttribute('aria-expanded', String(!expanded));
+      compToggle.innerHTML = expanded
+        ? '<i class="ti ti-chevron-down"></i> Expand'
+        : '<i class="ti ti-chevron-up"></i> Collapse';
+      compFields.style.display = expanded ? 'none' : 'block';
+    });
+    // Live summary update as user types
+    ['prdRef','excludedCountries','dateCutoff','dateColumnName','complianceNote'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', updateComplianceSummary);
+    });
+  }
 
   // Step 2 wiring
   const dz2 = document.getElementById('dropZone2');

@@ -15,6 +15,48 @@
     <p class="subtitle">Upload a lead intake file to check it against MaSH validation rules.</p>
   </header>
 
+  <div id="compliancePanel" class="compliance-panel">
+    <div class="compliance-header">
+      <span class="compliance-badge">Step 0</span>
+      <div>
+        <h2>Compliance rules <span class="compliance-optional">(optional)</span></h2>
+        <p>Fill in any batch-specific rules from the MaSH approval note before uploading the lead file.</p>
+      </div>
+      <button class="btn compliance-toggle" id="complianceToggle" aria-expanded="false">
+        <i class="ti ti-chevron-down"></i> Expand
+      </button>
+    </div>
+    <div id="complianceFields" style="display:none">
+      <div class="compliance-grid">
+        <div class="compliance-field">
+          <label for="prdRef">PRD / Approval reference</label>
+          <input type="text" id="prdRef" placeholder="e.g. PRD-97683-W8N3B" autocomplete="off">
+          <span class="field-hint">Recorded in the report for audit purposes only.</span>
+        </div>
+        <div class="compliance-field">
+          <label for="excludedCountries">Excluded countries</label>
+          <input type="text" id="excludedCountries" placeholder="e.g. Korea, Japan, France" autocomplete="off">
+          <span class="field-hint">Comma-separated. Any lead from these countries will be flagged.</span>
+        </div>
+        <div class="compliance-field">
+          <label for="dateCutoff">DNC cutoff date</label>
+          <input type="date" id="dateCutoff">
+          <span class="field-hint">Leads collected <b>after</b> this date will be flagged (DNC prevails).</span>
+        </div>
+        <div class="compliance-field">
+          <label for="dateColumnName">Collection date column name</label>
+          <input type="text" id="dateColumnName" placeholder="e.g. Collection Date" autocomplete="off">
+          <span class="field-hint">The column header in the lead file that contains the collection date.</span>
+        </div>
+      </div>
+      <div class="compliance-field" style="margin-top:.75rem">
+        <label for="complianceNote">Original approval note <span class="compliance-optional">(paste for audit trail)</span></label>
+        <textarea id="complianceNote" rows="3" placeholder="Paste the full note from MaSH here..."></textarea>
+      </div>
+      <div id="complianceSummary" class="compliance-summary" style="display:none"></div>
+    </div>
+  </div>
+
   <div id="dropZone" class="drop-zone">
     <i class="ti ti-table-import" aria-hidden="true"></i>
     <p><b>Drop your lead Excel file here</b></p>
@@ -27,6 +69,7 @@
 
   <div id="results" style="display:none">
     <div id="sheetNote"></div>
+    <div id="complianceAudit" class="compliance-report" style="display:none"></div>
     <div class="summary-grid" id="summaryGrid"></div>
     <div id="programStatusBreakdown" style="display:none"></div>
     <div class="section">

@@ -109,12 +109,77 @@ input[type="file"] { display: none; }
 .ps-bar { display: block; height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s; }
 .ps-count { text-align: right; font-weight: 600; color: var(--text-primary); }
 .ps-pct { text-align: right; color: var(--text-muted); font-size: 12px; }
+
+/* ── Step 0: Compliance panel ── */
+.compliance-panel { border: 1px solid var(--border-strong); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; background: var(--surface-1); }
+.compliance-header { display: flex; align-items: center; gap: .75rem; }
+.compliance-header h2 { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+.compliance-header p { font-size: 13px; color: var(--text-secondary); }
+.compliance-header > div { flex: 1; }
+.compliance-badge { flex-shrink: 0; background: #6366f1; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; letter-spacing: .04em; white-space: nowrap; }
+.compliance-optional { font-size: 12px; font-weight: 400; color: var(--text-muted); }
+.compliance-toggle { margin-left: auto; font-size: 12px; white-space: nowrap; }
+.compliance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem; margin-top: 1rem; }
+.compliance-field { display: flex; flex-direction: column; gap: 4px; }
+.compliance-field label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.compliance-field input, .compliance-field textarea { padding: 7px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius); font-size: 13px; font-family: inherit; background: var(--surface-2); color: var(--text-primary); resize: vertical; }
+.compliance-field input:focus, .compliance-field textarea:focus { outline: none; border-color: var(--accent); }
+.field-hint { font-size: 11px; color: var(--text-muted); }
+.compliance-summary { margin-top: .75rem; padding: .6rem .9rem; background: #eef2ff; border-radius: var(--radius); font-size: 12px; color: #4338ca; border: 1px solid #c7d2fe; }
+.compliance-summary strong { font-weight: 600; }
+.badge.compliance { background: #ede9fe; color: #6d28d9; }
+.compliance-report { margin-bottom: 1rem; padding: .75rem 1rem; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: var(--radius); font-size: 13px; }
+.compliance-report h4 { font-size: 12px; font-weight: 700; color: #5b21b6; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+.compliance-report p { color: var(--text-secondary); margin: 2px 0; }
+.compliance-report .note-text { font-style: italic; color: var(--text-muted); margin-top: 6px; font-size: 12px; border-top: 1px solid #ddd6fe; padding-top: 6px; }
 </style></head><body>
 <div class="wrap">
   <header class="page-header">
     <h1>Lead File Validator</h1>
     <p class="subtitle">Upload a lead intake file to check it against MaSH validation rules.</p>
   </header>
+
+  <div id="compliancePanel" class="compliance-panel">
+    <div class="compliance-header">
+      <span class="compliance-badge">Step 0</span>
+      <div>
+        <h2>Compliance rules <span class="compliance-optional">(optional)</span></h2>
+        <p>Fill in any batch-specific rules from the MaSH approval note before uploading the lead file.</p>
+      </div>
+      <button class="btn compliance-toggle" id="complianceToggle" aria-expanded="false">
+        <i class="ti ti-chevron-down"></i> Expand
+      </button>
+    </div>
+    <div id="complianceFields" style="display:none">
+      <div class="compliance-grid">
+        <div class="compliance-field">
+          <label for="prdRef">PRD / Approval reference</label>
+          <input type="text" id="prdRef" placeholder="e.g. PRD-97683-W8N3B" autocomplete="off">
+          <span class="field-hint">Recorded in the report for audit purposes only.</span>
+        </div>
+        <div class="compliance-field">
+          <label for="excludedCountries">Excluded countries</label>
+          <input type="text" id="excludedCountries" placeholder="e.g. Korea, Japan, France" autocomplete="off">
+          <span class="field-hint">Comma-separated. Any lead from these countries will be flagged.</span>
+        </div>
+        <div class="compliance-field">
+          <label for="dateCutoff">DNC cutoff date</label>
+          <input type="date" id="dateCutoff">
+          <span class="field-hint">Leads collected <b>after</b> this date will be flagged (DNC prevails).</span>
+        </div>
+        <div class="compliance-field">
+          <label for="dateColumnName">Collection date column name</label>
+          <input type="text" id="dateColumnName" placeholder="e.g. Collection Date" autocomplete="off">
+          <span class="field-hint">The column header in the lead file that contains the collection date.</span>
+        </div>
+      </div>
+      <div class="compliance-field" style="margin-top:.75rem">
+        <label for="complianceNote">Original approval note <span class="compliance-optional">(paste for audit trail)</span></label>
+        <textarea id="complianceNote" rows="3" placeholder="Paste the full note from MaSH here..."></textarea>
+      </div>
+      <div id="complianceSummary" class="compliance-summary" style="display:none"></div>
+    </div>
+  </div>
 
   <div id="dropZone" class="drop-zone">
     <i class="ti ti-table-import" aria-hidden="true"></i>
@@ -128,6 +193,7 @@ input[type="file"] { display: none; }
 
   <div id="results" style="display:none">
     <div id="sheetNote"></div>
+    <div id="complianceAudit" class="compliance-report" style="display:none"></div>
     <div class="summary-grid" id="summaryGrid"></div>
     <div id="programStatusBreakdown" style="display:none"></div>
     <div class="section">
@@ -304,7 +370,13 @@ const SCRUBBED_COMPANY_KEYWORDS = [
   'trabajador independiente',
   'student',
   'self learner',
-  'self-learner'
+  'self-learner',
+  'learner',
+  'independent learner',
+  'independent consultant',
+  'independent contractor',
+  'independiente',
+  'independant'
 ];
 
 // Patterns that mean the company name is just symbols/punctuation with no
@@ -338,7 +410,11 @@ const BAD_JOB_TITLE_KEYWORDS = [
   'student',
   'freelance',
   'self learner',
-  'self-learner'
+  'self-learner',
+  'learner',
+  'independent learner',
+  'independent consultant',
+  'independent contractor'
 ];
 
 // Name of the sheet in MaSH lead upload files that should be validated.
@@ -355,7 +431,8 @@ const COLUMN_ALIASES = {
   jobTitle: ['Job Title', 'JobTitle'],
   country: ['Country'],
   language: ['Language'],
-  programStatus: ['Program Status', 'ProgramStatus', 'Program_Status']
+  programStatus: ['Program Status', 'ProgramStatus', 'Program_Status'],
+  dateColumn: ['Collection Date', 'Date Collected', 'Lead Date', 'Created Date', 'Date', 'Timestamp']
 };
 
 // Exported for use in validator.js / app.js (browser-global, no bundler needed)
@@ -745,7 +822,7 @@ function stripAccents(s) {
 // Keywords to fuzzy-match against — a short focused list of the most
 // commonly mistyped blocklist terms. The full keyword list still runs
 // first as an exact/substring check; fuzzy is a third-layer safety net.
-const FUZZY_BLOCKLIST = ['freelance', 'student', 'self learner', 'estudiante'];
+const FUZZY_BLOCKLIST = ['freelance', 'student', 'self learner', 'estudiante', 'learner'];
 
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
@@ -955,7 +1032,11 @@ function isValidLanguage(value) {
  * - rejectedRows: Map of rowNum -> { rawRow, reasons[] } for the
  *   rejection template export (one row per lead, reasons consolidated)
  */
-function validateLeadData(data) {
+/**
+ * compliance: optional object with batch-level rules from the approval note:
+ *   { prdRef, originalNote, excludedCountries[], dateCutoff, dateColumnName }
+ */
+function validateLeadData(data, compliance) {
   if (!data || data.length < 2) {
     return { checked: 0, errors: [], headers: [], rejectedRows: new Map(), emptyFile: true };
   }
@@ -963,6 +1044,11 @@ function validateLeadData(data) {
   const headers = data[0].map(h => (h ? h.toString().trim() : ''));
   const rows = data.slice(1);
   const cols = RULES.COLUMN_ALIASES;
+
+  // Resolve date column — prefer the user-specified name, then fall back to aliases
+  const dateColCandidates = compliance && compliance.dateColumnName
+    ? [compliance.dateColumnName, ...cols.dateColumn]
+    : cols.dateColumn;
 
   const colIdx = {
     email: findColumn(headers, cols.email),
@@ -972,12 +1058,19 @@ function validateLeadData(data) {
     jobTitle: findColumn(headers, cols.jobTitle),
     country: findColumn(headers, cols.country),
     language: findColumn(headers, cols.language),
-    programStatus: findColumn(headers, cols.programStatus)
+    programStatus: findColumn(headers, cols.programStatus),
+    date: findColumn(headers, dateColCandidates)
   };
+
+  // Normalise compliance rules
+  const excludedCountries = (compliance && compliance.excludedCountries || [])
+    .map(c => normalizeForMatch(c));
+  const dateCutoff = compliance && compliance.dateCutoff
+    ? new Date(compliance.dateCutoff) : null;
 
   const errors = [];
   const rejectedRows = new Map();
-  const programStatusCounts = {};  // { "Registered": 12, "Attended": 8, ... }
+  const programStatusCounts = {};
   let checked = 0;
 
   rows.forEach((row, i) => {
@@ -986,7 +1079,6 @@ function validateLeadData(data) {
     if (!hasData) return;
     checked++;
 
-    // Count Program Status values
     if (colIdx.programStatus > -1) {
       const val = (row[colIdx.programStatus] || '').toString().trim() || '(blank)';
       programStatusCounts[val] = (programStatusCounts[val] || 0) + 1;
@@ -1002,6 +1094,7 @@ function validateLeadData(data) {
       }
     };
 
+    // ── Standard field validation ──
     if (colIdx.email > -1) pushIfBad(isValidEmail(row[colIdx.email]), 'Email Address', row[colIdx.email], 'email');
     if (colIdx.company > -1) pushIfBad(isValidCompany(row[colIdx.company]), 'Company Name', row[colIdx.company], 'company');
     if (colIdx.firstName > -1) pushIfBad(isValidName(row[colIdx.firstName], 'First name'), 'First Name', row[colIdx.firstName], 'name');
@@ -1009,9 +1102,33 @@ function validateLeadData(data) {
     if (colIdx.jobTitle > -1) pushIfBad(isValidJobTitle(row[colIdx.jobTitle]), 'Job Title', row[colIdx.jobTitle], 'jobtitle');
     if (colIdx.country > -1) pushIfBad(isInReferenceList(row[colIdx.country], 'Country', REFERENCE_DATA.COUNTRIES), 'Country', row[colIdx.country], 'other');
     if (colIdx.language > -1) pushIfBad(isValidLanguage(row[colIdx.language]), 'Language', row[colIdx.language], 'other');
+
+    // ── Compliance checks ──
+    // Country exclusion
+    if (excludedCountries.length > 0 && colIdx.country > -1) {
+      const countryVal = (row[colIdx.country] || '').toString().trim();
+      if (countryVal && excludedCountries.includes(normalizeForMatch(countryVal))) {
+        pushIfBad({ ok: false, msg: `Country "${countryVal}" is excluded from this upload batch per the compliance note` }, 'Country (Compliance)', countryVal, 'compliance');
+      }
+    }
+
+    // Date cutoff — flag leads collected after the cutoff date
+    if (dateCutoff && colIdx.date > -1) {
+      const rawDate = (row[colIdx.date] || '').toString().trim();
+      if (!rawDate) {
+        pushIfBad({ ok: false, msg: 'Collection date is blank — required for DNC compliance verification' }, 'Collection Date', rawDate, 'compliance');
+      } else {
+        const leadDate = new Date(rawDate);
+        if (isNaN(leadDate.getTime())) {
+          pushIfBad({ ok: false, msg: `Collection date "${rawDate}" is not a valid date` }, 'Collection Date', rawDate, 'compliance');
+        } else if (leadDate > dateCutoff) {
+          pushIfBad({ ok: false, msg: `Lead collected on ${rawDate} is after the DNC cutoff date (${compliance.dateCutoff})` }, 'Collection Date', rawDate, 'compliance');
+        }
+      }
+    }
   });
 
-  return { checked, errors, headers, rejectedRows, programStatusCounts, emptyFile: false };
+  return { checked, errors, headers, rejectedRows, programStatusCounts, compliance, emptyFile: false };
 }
 
 
@@ -1025,12 +1142,45 @@ function setStatus(msg, type) {
   bar.innerHTML = msg;
 }
 
+function getComplianceRules() {
+  const prdRef = (document.getElementById('prdRef')?.value || '').trim();
+  const excludedRaw = (document.getElementById('excludedCountries')?.value || '').trim();
+  const dateCutoff = (document.getElementById('dateCutoff')?.value || '').trim();
+  const dateColumnName = (document.getElementById('dateColumnName')?.value || '').trim();
+  const originalNote = (document.getElementById('complianceNote')?.value || '').trim();
+
+  const excludedCountries = excludedRaw
+    ? excludedRaw.split(',').map(c => c.trim()).filter(Boolean)
+    : [];
+
+  const hasRules = prdRef || excludedCountries.length > 0 || dateCutoff || originalNote;
+
+  return hasRules
+    ? { prdRef, excludedCountries, dateCutoff, dateColumnName, originalNote }
+    : null;
+}
+
+function updateComplianceSummary() {
+  const rules = getComplianceRules();
+  const el = document.getElementById('complianceSummary');
+  if (!el) return;
+  if (!rules) { el.style.display = 'none'; return; }
+  const parts = [];
+  if (rules.prdRef) parts.push(`<strong>PRD:</strong> ${escapeHtml(rules.prdRef)}`);
+  if (rules.excludedCountries.length) parts.push(`<strong>Excluded:</strong> ${rules.excludedCountries.map(escapeHtml).join(', ')}`);
+  if (rules.dateCutoff) parts.push(`<strong>DNC cutoff:</strong> ${escapeHtml(rules.dateCutoff)}`);
+  el.innerHTML = '✓ Compliance rules active — ' + parts.join(' &nbsp;·&nbsp; ');
+  el.style.display = parts.length ? 'block' : 'none';
+}
+
 function resetTool() {
   document.getElementById('results').style.display = 'none';
   document.getElementById('statusBar').style.display = 'none';
   document.getElementById('fileIn').value = '';
   document.getElementById('dropZone').style.display = '';
   document.getElementById('programStatusBreakdown').style.display = 'none';
+  const ca = document.getElementById('complianceAudit');
+  if (ca) ca.style.display = 'none';
   // Reset Step 2
   document.getElementById('step2Section').style.display = 'none';
   document.getElementById('step2Status').style.display = 'none';
@@ -1039,7 +1189,7 @@ function resetTool() {
   _rejectedEmailSet = new Set();
 }
 
-function renderResults({ checked, errors, headers, rejectedRows, programStatusCounts, sheetName, sheetWarning }) {
+function renderResults({ checked, errors, headers, rejectedRows, programStatusCounts, compliance, sheetName, sheetWarning }) {
   const errorRowCount = new Set(errors.map(e => e.row)).size;
   const cleanRows = checked - errorRowCount;
 
@@ -1056,6 +1206,28 @@ function renderResults({ checked, errors, headers, rejectedRows, programStatusCo
     sheetNote = `<div class="sheet-note">Validated sheet: <b>${escapeHtml(sheetName)}</b></div>`;
   }
   document.getElementById('sheetNote').innerHTML = sheetNote;
+
+  // Compliance audit block
+  const compAuditEl = document.getElementById('complianceAudit');
+  if (compAuditEl) {
+    if (compliance) {
+      const complianceErrors = errors.filter(e => e.type === 'compliance');
+      const lines = [];
+      if (compliance.prdRef) lines.push(`<p><strong>Approval ref:</strong> ${escapeHtml(compliance.prdRef)}</p>`);
+      if (compliance.excludedCountries && compliance.excludedCountries.length)
+        lines.push(`<p><strong>Excluded countries:</strong> ${compliance.excludedCountries.map(escapeHtml).join(', ')}</p>`);
+      if (compliance.dateCutoff)
+        lines.push(`<p><strong>DNC cutoff date:</strong> ${escapeHtml(compliance.dateCutoff)}</p>`);
+      if (complianceErrors.length)
+        lines.push(`<p><strong>Compliance violations:</strong> ${complianceErrors.length} lead(s) flagged</p>`);
+      if (compliance.originalNote)
+        lines.push(`<div class="note-text"><strong>Note:</strong> ${escapeHtml(compliance.originalNote)}</div>`);
+      compAuditEl.innerHTML = `<h4>Compliance rules applied</h4>${lines.join('')}`;
+      compAuditEl.style.display = 'block';
+    } else {
+      compAuditEl.style.display = 'none';
+    }
+  }
 
   document.getElementById('summaryGrid').innerHTML = `
     <div class="metric"><div class="label">Rows checked</div><div class="val">${checked}</div></div>
@@ -1264,7 +1436,8 @@ function handleFile(file) {
       const ws = wb.Sheets[sheetName];
       const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-      const result = Validator.validateLeadData(data);
+      const compliance = getComplianceRules();
+      const result = Validator.validateLeadData(data, compliance);
       if (result.emptyFile) {
         setStatus('File appears empty or has no data rows.', 'error');
         return;
@@ -1486,6 +1659,25 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('resetBtn').addEventListener('click', resetTool);
+
+  // Compliance panel toggle
+  const compToggle = document.getElementById('complianceToggle');
+  const compFields = document.getElementById('complianceFields');
+  if (compToggle && compFields) {
+    compToggle.addEventListener('click', () => {
+      const expanded = compToggle.getAttribute('aria-expanded') === 'true';
+      compToggle.setAttribute('aria-expanded', String(!expanded));
+      compToggle.innerHTML = expanded
+        ? '<i class="ti ti-chevron-down"></i> Expand'
+        : '<i class="ti ti-chevron-up"></i> Collapse';
+      compFields.style.display = expanded ? 'none' : 'block';
+    });
+    // Live summary update as user types
+    ['prdRef','excludedCountries','dateCutoff','dateColumnName','complianceNote'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', updateComplianceSummary);
+    });
+  }
 
   // Step 2 wiring
   const dz2 = document.getElementById('dropZone2');

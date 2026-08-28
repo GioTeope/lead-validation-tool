@@ -109,3 +109,26 @@ input[type="file"] { display: none; }
 .ps-bar { display: block; height: 100%; background: var(--accent); border-radius: 4px; transition: width .3s; }
 .ps-count { text-align: right; font-weight: 600; color: var(--text-primary); }
 .ps-pct { text-align: right; color: var(--text-muted); font-size: 12px; }
+
+/* ── Step 0: Compliance panel ── */
+.compliance-panel { border: 1px solid var(--border-strong); border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; background: var(--surface-1); }
+.compliance-header { display: flex; align-items: center; gap: .75rem; }
+.compliance-header h2 { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+.compliance-header p { font-size: 13px; color: var(--text-secondary); }
+.compliance-header > div { flex: 1; }
+.compliance-badge { flex-shrink: 0; background: #6366f1; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; letter-spacing: .04em; white-space: nowrap; }
+.compliance-optional { font-size: 12px; font-weight: 400; color: var(--text-muted); }
+.compliance-toggle { margin-left: auto; font-size: 12px; white-space: nowrap; }
+.compliance-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem; margin-top: 1rem; }
+.compliance-field { display: flex; flex-direction: column; gap: 4px; }
+.compliance-field label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.compliance-field input, .compliance-field textarea { padding: 7px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius); font-size: 13px; font-family: inherit; background: var(--surface-2); color: var(--text-primary); resize: vertical; }
+.compliance-field input:focus, .compliance-field textarea:focus { outline: none; border-color: var(--accent); }
+.field-hint { font-size: 11px; color: var(--text-muted); }
+.compliance-summary { margin-top: .75rem; padding: .6rem .9rem; background: #eef2ff; border-radius: var(--radius); font-size: 12px; color: #4338ca; border: 1px solid #c7d2fe; }
+.compliance-summary strong { font-weight: 600; }
+.badge.compliance { background: #ede9fe; color: #6d28d9; }
+.compliance-report { margin-bottom: 1rem; padding: .75rem 1rem; background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: var(--radius); font-size: 13px; }
+.compliance-report h4 { font-size: 12px; font-weight: 700; color: #5b21b6; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+.compliance-report p { color: var(--text-secondary); margin: 2px 0; }
+.compliance-report .note-text { font-style: italic; color: var(--text-muted); margin-top: 6px; font-size: 12px; border-top: 1px solid #ddd6fe; padding-top: 6px; }

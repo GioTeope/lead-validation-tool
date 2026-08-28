@@ -51,7 +51,7 @@ function stripAccents(s) {
 // Keywords to fuzzy-match against — a short focused list of the most
 // commonly mistyped blocklist terms. The full keyword list still runs
 // first as an exact/substring check; fuzzy is a third-layer safety net.
-const FUZZY_BLOCKLIST = ['freelance', 'student', 'self learner', 'estudiante'];
+const FUZZY_BLOCKLIST = ['freelance', 'student', 'self learner', 'estudiante', 'learner'];
 
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
@@ -261,7 +261,11 @@ function isValidLanguage(value) {
  * - rejectedRows: Map of rowNum -> { rawRow, reasons[] } for the
  *   rejection template export (one row per lead, reasons consolidated)
  */
-function validateLeadData(data) {
+/**
+ * compliance: optional object with batch-level rules from the approval note:
+ *   { prdRef, originalNote, excludedCountries[], dateCutoff, dateColumnName }
+ */
+function validateLeadData(data, compliance) {
   if (!data || data.length < 2) {
     return { checked: 0, errors: [], headers: [], rejectedRows: new Map(), emptyFile: true };
   }
@@ -269,6 +273,11 @@ function validateLeadData(data) {
   const headers = data[0].map(h => (h ? h.toString().trim() : ''));
   const rows = data.slice(1);
   const cols = RULES.COLUMN_ALIASES;
+
+  // Resolve date column — prefer the user-specified name, then fall back to aliases
+  const dateColCandidates = compliance && compliance.dateColumnName
+    ? [compliance.dateColumnName, ...cols.dateColumn]
+    : cols.dateColumn;
 
   const colIdx = {
     email: findColumn(headers, cols.email),
@@ -278,12 +287,19 @@ function validateLeadData(data) {
     jobTitle: findColumn(headers, cols.jobTitle),
     country: findColumn(headers, cols.country),
     language: findColumn(headers, cols.language),
-    programStatus: findColumn(headers, cols.programStatus)
+    programStatus: findColumn(headers, cols.programStatus),
+    date: findColumn(headers, dateColCandidates)
   };
+
+  // Normalise compliance rules
+  const excludedCountries = (compliance && compliance.excludedCountries || [])
+    .map(c => normalizeForMatch(c));
+  const dateCutoff = compliance && compliance.dateCutoff
+    ? new Date(compliance.dateCutoff) : null;
 
   const errors = [];
   const rejectedRows = new Map();
-  const programStatusCounts = {};  // { "Registered": 12, "Attended": 8, ... }
+  const programStatusCounts = {};
   let checked = 0;
 
   rows.forEach((row, i) => {
@@ -292,7 +308,6 @@ function validateLeadData(data) {
     if (!hasData) return;
     checked++;
 
-    // Count Program Status values
     if (colIdx.programStatus > -1) {
       const val = (row[colIdx.programStatus] || '').toString().trim() || '(blank)';
       programStatusCounts[val] = (programStatusCounts[val] || 0) + 1;
@@ -308,6 +323,7 @@ function validateLeadData(data) {
       }
     };
 
+    // ── Standard field validation ──
     if (colIdx.email > -1) pushIfBad(isValidEmail(row[colIdx.email]), 'Email Address', row[colIdx.email], 'email');
     if (colIdx.company > -1) pushIfBad(isValidCompany(row[colIdx.company]), 'Company Name', row[colIdx.company], 'company');
     if (colIdx.firstName > -1) pushIfBad(isValidName(row[colIdx.firstName], 'First name'), 'First Name', row[colIdx.firstName], 'name');
@@ -315,9 +331,33 @@ function validateLeadData(data) {
     if (colIdx.jobTitle > -1) pushIfBad(isValidJobTitle(row[colIdx.jobTitle]), 'Job Title', row[colIdx.jobTitle], 'jobtitle');
     if (colIdx.country > -1) pushIfBad(isInReferenceList(row[colIdx.country], 'Country', REFERENCE_DATA.COUNTRIES), 'Country', row[colIdx.country], 'other');
     if (colIdx.language > -1) pushIfBad(isValidLanguage(row[colIdx.language]), 'Language', row[colIdx.language], 'other');
+
+    // ── Compliance checks ──
+    // Country exclusion
+    if (excludedCountries.length > 0 && colIdx.country > -1) {
+      const countryVal = (row[colIdx.country] || '').toString().trim();
+      if (countryVal && excludedCountries.includes(normalizeForMatch(countryVal))) {
+        pushIfBad({ ok: false, msg: `Country "${countryVal}" is excluded from this upload batch per the compliance note` }, 'Country (Compliance)', countryVal, 'compliance');
+      }
+    }
+
+    // Date cutoff — flag leads collected after the cutoff date
+    if (dateCutoff && colIdx.date > -1) {
+      const rawDate = (row[colIdx.date] || '').toString().trim();
+      if (!rawDate) {
+        pushIfBad({ ok: false, msg: 'Collection date is blank — required for DNC compliance verification' }, 'Collection Date', rawDate, 'compliance');
+      } else {
+        const leadDate = new Date(rawDate);
+        if (isNaN(leadDate.getTime())) {
+          pushIfBad({ ok: false, msg: `Collection date "${rawDate}" is not a valid date` }, 'Collection Date', rawDate, 'compliance');
+        } else if (leadDate > dateCutoff) {
+          pushIfBad({ ok: false, msg: `Lead collected on ${rawDate} is after the DNC cutoff date (${compliance.dateCutoff})` }, 'Collection Date', rawDate, 'compliance');
+        }
+      }
+    }
   });
 
-  return { checked, errors, headers, rejectedRows, programStatusCounts, emptyFile: false };
+  return { checked, errors, headers, rejectedRows, programStatusCounts, compliance, emptyFile: false };
 }
 
 // Browser-global export (no bundler in this lightweight tool)
