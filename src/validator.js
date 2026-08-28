@@ -51,7 +51,7 @@ function stripAccents(s) {
 // Keywords to fuzzy-match against — a short focused list of the most
 // commonly mistyped blocklist terms. The full keyword list still runs
 // first as an exact/substring check; fuzzy is a third-layer safety net.
-const FUZZY_BLOCKLIST = ['freelance', 'student', 'self learner', 'estudiante', 'learner'];
+const FUZZY_BLOCKLIST = ['freelance', 'student', 'self learner', 'estudiante'];
 
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
