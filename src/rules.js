@@ -95,7 +95,8 @@ const SCRUBBED_COMPANIES = [
   'Marketo',
   'Finland',
   'hotmail.com',
-  'tes@tst.com'
+  'tes@tst.com',
+  'Graduate'
 ];
 
 // Keywords/substrings that indicate an invalid company name if found ANYWHERE
@@ -117,11 +118,23 @@ const SCRUBBED_COMPANY_KEYWORDS = [
   'leraner',
   'lerner',
   'learnner',
+  'self employed',
+  'self-employed',
   'independent learner',
   'independent consultant',
   'independent contractor',
+  'independent developer',
+  'independent consulting',
   'independiente',
-  'independant'
+  'independant',
+  'fresh graduate',
+  'new graduate',
+  'recent graduate',
+  'graduate student',
+  'graduate trainee',
+  'graduate intern',
+  'graduated',
+  'i am a'
 ];
 
 // Patterns that mean the company name is just symbols/punctuation with no
@@ -145,7 +158,13 @@ const BAD_JOB_TITLES = [
   'Graduate Student',
   'Working Student AIDigital Transformation Adoption',
   'Artificial Intelligence Student',
-  'Thesis Student'
+  'Thesis Student',
+  'Graduate',
+  'Fresh Graduate',
+  'New Graduate',
+  'Recent Graduate',
+  'Graduate Trainee',
+  'Graduate Intern'
 ];
 
 // Keywords/substrings that indicate an invalid job title if found ANYWHERE
@@ -160,9 +179,21 @@ const BAD_JOB_TITLE_KEYWORDS = [
   'leraner',
   'lerner',
   'learnner',
+  'self employed',
+  'self-employed',
   'independent learner',
   'independent consultant',
-  'independent contractor'
+  'independent contractor',
+  'independent developer',
+  'independent consulting',
+  'fresh graduate',
+  'new graduate',
+  'recent graduate',
+  'graduate student',
+  'graduate trainee',
+  'graduate intern',
+  'graduated',
+  'i am a'
 ];
 
 // Name of the sheet in MaSH lead upload files that should be validated.
