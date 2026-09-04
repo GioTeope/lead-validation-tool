@@ -81,10 +81,24 @@
         </table>
       </div>
     </div>
-    <div class="actions">
-      <button class="btn primary" id="dlBtn"><i class="ti ti-download" aria-hidden="true"></i> Download error report (.csv)</button>
-      <button class="btn primary" id="dlRejBtn"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Download rejected leads (.csv)</button>
-      <button class="btn" id="resetBtn"><i class="ti ti-refresh" aria-hidden="true"></i> Validate another file</button>
+    <div class="dl-group">
+      <div class="dl-row">
+        <div class="dl-filename-wrap">
+          <span class="dl-label">Error report</span>
+          <span class="dl-filename-preview" id="previewErrorReport"></span>
+        </div>
+        <button class="btn primary" id="dlBtn"><i class="ti ti-download" aria-hidden="true"></i> Download</button>
+      </div>
+      <div class="dl-row">
+        <div class="dl-filename-wrap">
+          <span class="dl-label">Rejected leads</span>
+          <span class="dl-filename-preview" id="previewRejectedLeads"></span>
+        </div>
+        <button class="btn primary" id="dlRejBtn"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Download</button>
+      </div>
+      <div class="dl-row dl-row-reset">
+        <button class="btn" id="resetBtn"><i class="ti ti-refresh" aria-hidden="true"></i> Validate another file</button>
+      </div>
     </div>
   </div>
 
@@ -110,9 +124,21 @@
   </div>
   <input type="file" id="fileIn2" accept=".txt">
   <div id="step2Status" class="status-bar" style="display:none"></div>
-  <div id="step2Actions" class="actions" style="display:none">
-    <button class="btn primary" id="dlCleanBtn"><i class="ti ti-circle-check" aria-hidden="true"></i> Download cleaned file (.txt)</button>
-    <button class="btn" id="dlRemovedBtn"><i class="ti ti-trash" aria-hidden="true"></i> Download removed rows (.txt)</button>
+  <div id="step2Actions" class="dl-group" style="display:none">
+    <div class="dl-row">
+      <div class="dl-filename-wrap">
+        <span class="dl-label">Cleaned file</span>
+        <span class="dl-filename-preview" id="previewClean"></span>
+      </div>
+      <button class="btn primary" id="dlCleanBtn"><i class="ti ti-circle-check" aria-hidden="true"></i> Download</button>
+    </div>
+    <div class="dl-row">
+      <div class="dl-filename-wrap">
+        <span class="dl-label">Removed rows</span>
+        <span class="dl-filename-preview" id="previewRemoved"></span>
+      </div>
+      <button class="btn" id="dlRemovedBtn"><i class="ti ti-trash" aria-hidden="true"></i> Download</button>
+    </div>
   </div>
 </div>
 

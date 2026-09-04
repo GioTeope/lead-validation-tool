@@ -53,6 +53,12 @@ function resetTool() {
   document.getElementById('programStatusBreakdown').style.display = 'none';
   const ca = document.getElementById('complianceAudit');
   if (ca) ca.style.display = 'none';
+  _leadFileBaseName = '';
+  _dashFileBaseName = '';
+  ['previewErrorReport','previewRejectedLeads'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '';
+  });
   // Reset Step 2
   document.getElementById('step2Section').style.display = 'none';
   document.getElementById('step2Status').style.display = 'none';
@@ -143,6 +149,13 @@ function renderResults({ checked, errors, headers, rejectedRows, programStatusCo
 
   document.getElementById('dlBtn').onclick = (e) => downloadErrorReport(errors, e.currentTarget);
   document.getElementById('dlRejBtn').onclick = (e) => downloadRejectionTemplate(headers, rejectedRows, e.currentTarget);
+
+  // Update filename preview labels
+  const base = _leadFileBaseName || 'lead_validation';
+  const prev = document.getElementById('previewErrorReport');
+  const prevRej = document.getElementById('previewRejectedLeads');
+  if (prev) prev.textContent = base + '_errors.csv';
+  if (prevRej) prevRej.textContent = base + '_rejected.csv';
 
   // Reveal Step 2 if there are rejected leads to clean up
   if (rejectedRows.size > 0) {
@@ -244,6 +257,18 @@ function triggerDownload(content, filename, isArray) {
   a.click();
 }
 
+function getFilename(inputId, fallback) {
+  const raw = (document.getElementById(inputId)?.value || '').trim();
+  // Strip any extension the user may have typed — we add it ourselves
+  return raw.replace(/\.[a-z]{2,5}$/i, '') || fallback;
+}
+
+function updateExtLabel(previewId, fmt, baseSuffix) {
+  const ext = fmt === 'xlsx' ? '.xlsx' : fmt === 'txt' ? '.txt' : '.csv';
+  const el = document.getElementById(previewId);
+  if (el) el.textContent = (_leadFileBaseName || 'lead_validation') + baseSuffix + ext;
+}
+
 function exportFile(fmt, baseName, headers, dataRows) {
   if (fmt === 'xlsx') {
     triggerDownload(buildXlsx(headers, dataRows), baseName + '.xlsx', true);
@@ -261,7 +286,10 @@ function downloadErrorReport(errors, anchorBtn) {
     ? [['—', '—', '—', 'No errors found']]
     : errors.map(e => [String(e.row), e.field, String(e.value), e.issue]);
 
-  showFormatPicker(anchorBtn, fmt => exportFile(fmt, 'lead_validation_errors', headers, dataRows));
+  showFormatPicker(anchorBtn, fmt => {
+    updateExtLabel('previewErrorReport', fmt, '_errors');
+    exportFile(fmt, (_leadFileBaseName || 'lead_validation') + '_errors', headers, dataRows);
+  });
 }
 
 // ── Rejection template: one row per rejected lead ────────────────────────────
@@ -274,7 +302,10 @@ function downloadRejectionTemplate(fileHeaders, rejectedRows, anchorBtn) {
     dataRows.push([reason, ...padded]);
   });
 
-  showFormatPicker(anchorBtn, fmt => exportFile(fmt, 'rejected_leads', headers, dataRows));
+  showFormatPicker(anchorBtn, fmt => {
+    updateExtLabel('previewRejectedLeads', fmt, '_rejected');
+    exportFile(fmt, (_leadFileBaseName || 'rejected') + '_rejected', headers, dataRows);
+  });
 }
 
 function selectTargetSheet(workbook) {
@@ -288,12 +319,17 @@ function selectTargetSheet(workbook) {
 
 // Stores the set of rejected emails after Step 1 — used in Step 2
 let _rejectedEmailSet = new Set();
+let _leadFileBaseName = '';      // e.g. "APAC_Leads_Q2" from "APAC_Leads_Q2.xlsx"
+let _dashFileBaseName = '';      // e.g. "Dashboard_Export_June"
+
+function getBaseName(file) {
+  return file.name.replace(/\.[^.]+$/, ''); // strip extension
+}
+
 
 function handleFile(file) {
-  if (!file) {
-    setStatus('No file selected.', 'error');
-    return;
-  }
+  if (!file) { setStatus('No file selected.', 'error'); return; }
+  _leadFileBaseName = getBaseName(file);
   const ext = file.name.split('.').pop().toLowerCase();
   setStatus(`<i class="ti ti-loader"></i> Reading <b>${escapeHtml(file.name)}</b>...`, 'info');
 
@@ -360,6 +396,7 @@ function setStep2Status(msg, type) {
 
 function handleDashboardFile(file) {
   if (!file) return;
+  _dashFileBaseName = getBaseName(file);
 
   // Hide previous results
   document.getElementById('step2Actions').style.display = 'none';
@@ -478,12 +515,19 @@ function handleDashboardFile(file) {
 
       document.getElementById('step2Actions').style.display = 'flex';
 
+      // Update filename preview labels
+      const dashBase = _dashFileBaseName || 'dashboard';
+      const pClean = document.getElementById('previewClean');
+      const pRemoved = document.getElementById('previewRemoved');
+      if (pClean) pClean.textContent = dashBase + '_cleaned.txt';
+      if (pRemoved) pRemoved.textContent = dashBase + '_removed.txt';
+
       document.getElementById('dlCleanBtn').onclick = () => {
         const content = [headers, ...cleanRows].map(r => r.join('\t')).join('\n');
         const blob = new Blob(['\uFEFF' + content], { type: 'text/plain;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'dashboard_cleaned.txt';
+        a.download = (_dashFileBaseName || 'dashboard') + '_cleaned.txt';
         a.click();
       };
 
@@ -492,7 +536,7 @@ function handleDashboardFile(file) {
         const blob = new Blob(['\uFEFF' + content], { type: 'text/plain;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'dashboard_removed.txt';
+        a.download = (_dashFileBaseName || 'dashboard') + '_removed.txt';
         a.click();
       };
 

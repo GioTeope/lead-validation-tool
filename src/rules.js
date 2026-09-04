@@ -112,6 +112,8 @@ const SCRUBBED_COMPANY_KEYWORDS = [
   'trabajador-independiente',
   'trabajador independiente',
   'student',
+  'studying',
+  'currently studying',
   'self learner',
   'self-learner',
   'learner',
@@ -134,7 +136,18 @@ const SCRUBBED_COMPANY_KEYWORDS = [
   'graduate trainee',
   'graduate intern',
   'graduated',
-  'i am a'
+  'i am a',
+  'not employed',
+  'not currently employed',
+  'currently unemployed',
+  'unemployed',
+  'no employer',
+  'between jobs',
+  'looking for work',
+  'job hunting',
+  'job seeker',
+  'not working',
+  'not in a company'
 ];
 
 // Patterns that mean the company name is just symbols/punctuation with no
@@ -193,7 +206,20 @@ const BAD_JOB_TITLE_KEYWORDS = [
   'graduate trainee',
   'graduate intern',
   'graduated',
-  'i am a'
+  'i am a',
+  'studying',
+  'currently studying',
+  'not employed',
+  'not currently employed',
+  'currently unemployed',
+  'unemployed',
+  'no employer',
+  'between jobs',
+  'looking for work',
+  'job hunting',
+  'job seeker',
+  'not working',
+  'not in a company'
 ];
 
 // Name of the sheet in MaSH lead upload files that should be validated.

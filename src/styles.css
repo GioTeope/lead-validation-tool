@@ -132,3 +132,16 @@ input[type="file"] { display: none; }
 .compliance-report h4 { font-size: 12px; font-weight: 700; color: #5b21b6; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
 .compliance-report p { color: var(--text-secondary); margin: 2px 0; }
 .compliance-report .note-text { font-style: italic; color: var(--text-muted); margin-top: 6px; font-size: 12px; border-top: 1px solid #ddd6fe; padding-top: 6px; }
+
+/* ── Download filename inputs ── */
+.dl-group { display: flex; flex-direction: column; gap: 10px; margin-top: 1.5rem; }
+.dl-row { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.dl-row-reset { margin-top: 4px; }
+.dl-filename-wrap { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 180px; }
+.dl-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.dl-input-row { display: flex; align-items: center; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; background: var(--surface-2); }
+.dl-filename-input { flex: 1; border: none; padding: 7px 10px; font-size: 13px; font-family: inherit; background: transparent; color: var(--text-primary); outline: none; }
+.dl-filename-input::placeholder { color: var(--text-muted); }
+.dl-ext { padding: 7px 10px 7px 0; font-size: 13px; color: var(--text-muted); white-space: nowrap; font-family: monospace; }
+
+.dl-filename-preview { font-size: 13px; color: var(--text-secondary); font-family: monospace; background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 10px; display: inline-block; }
