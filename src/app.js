@@ -53,9 +53,12 @@ function resetTool() {
   document.getElementById('programStatusBreakdown').style.display = 'none';
   const ca = document.getElementById('complianceAudit');
   if (ca) ca.style.display = 'none';
+  const rp = document.getElementById('reviewPanel');
+  if (rp) { rp.style.display = 'none'; rp.innerHTML = ''; }
   _leadFileBaseName = '';
   _dashFileBaseName = '';
-  ['previewErrorReport','previewRejectedLeads'].forEach(id => {
+  window._reviewRows = [];
+  ['previewErrorReport'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = '';
   });
@@ -148,20 +151,154 @@ function renderResults({ checked, errors, headers, rejectedRows, programStatusCo
   }
 
   document.getElementById('dlBtn').onclick = (e) => downloadErrorReport(errors, e.currentTarget);
-  document.getElementById('dlRejBtn').onclick = (e) => downloadRejectionTemplate(headers, rejectedRows, e.currentTarget);
 
   // Update filename preview labels
   const base = _leadFileBaseName || 'lead_validation';
   const prev = document.getElementById('previewErrorReport');
-  const prevRej = document.getElementById('previewRejectedLeads');
   if (prev) prev.textContent = base + '_errors.csv';
-  if (prevRej) prevRej.textContent = base + '_rejected.csv';
+
+  // Build review panel for rejected leads
+  renderReviewPanel(headers, rejectedRows, base);
 
   // Reveal Step 2 if there are rejected leads to clean up
   if (rejectedRows.size > 0) {
     document.getElementById('step2Section').style.display = 'block';
     document.getElementById('step2Count').textContent = rejectedRows.size;
   }
+}
+
+// ── Manual review panel ──────────────────────────────────────────────────────
+// Shows each flagged lead with a Keep / Remove toggle so the team can
+// review before downloading the rejected leads file.
+
+function renderReviewPanel(headers, rejectedRows, baseFilename) {
+  const panel = document.getElementById('reviewPanel');
+  if (!panel) return;
+
+  if (rejectedRows.size === 0) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  // Find key column indices for the review preview
+  const emailIdx  = headers.findIndex(h => RULES.COLUMN_ALIASES.email.some(a => a.toLowerCase() === h.toLowerCase()));
+  const firstIdx  = headers.findIndex(h => RULES.COLUMN_ALIASES.firstName.some(a => a.toLowerCase() === h.toLowerCase()));
+  const lastIdx   = headers.findIndex(h => RULES.COLUMN_ALIASES.lastName.some(a => a.toLowerCase() === h.toLowerCase()));
+  const compIdx   = headers.findIndex(h => RULES.COLUMN_ALIASES.company.some(a => a.toLowerCase() === h.toLowerCase()));
+  const jobIdx    = headers.findIndex(h => RULES.COLUMN_ALIASES.jobTitle.some(a => a.toLowerCase() === h.toLowerCase()));
+
+  // Build review rows — each starts as 'remove' (pre-ticked)
+  const reviewRows = [];
+  rejectedRows.forEach(({ rawRow, reasons }, rowNum) => {
+    reviewRows.push({ rowNum, rawRow, reasons, action: 'remove' });
+  });
+  window._reviewRows = reviewRows; // store for download use
+
+  const emailH  = emailIdx  > -1 ? 'Email' : '';
+  const nameH   = (firstIdx > -1 || lastIdx > -1) ? 'Name' : '';
+  const compH   = compIdx   > -1 ? 'Company' : '';
+  const jobH    = jobIdx    > -1 ? 'Job Title' : '';
+
+  function getCell(row, idx) { return idx > -1 ? escapeHtml((row[idx] || '').toString().trim()) : ''; }
+  function buildName(row) {
+    const f = firstIdx > -1 ? (row[firstIdx] || '') : '';
+    const l = lastIdx  > -1 ? (row[lastIdx]  || '') : '';
+    return escapeHtml((f + ' ' + l).trim());
+  }
+
+  const rows = reviewRows.map((r, i) => `
+    <tr id="rv-row-${i}" class="rv-row rv-remove">
+      <td class="rv-cell-check">
+        <label class="rv-toggle">
+          <input type="checkbox" class="rv-chk" data-idx="${i}" checked onchange="updateReviewRow(${i}, this.checked)">
+          <span class="rv-pill rv-pill-remove">Remove</span>
+          <span class="rv-pill rv-pill-keep" style="display:none">Keep</span>
+        </label>
+      </td>
+      <td class="muted rv-rownum">${r.rowNum}</td>
+      ${emailH  ? `<td class="rv-email value-cell">${getCell(r.rawRow, emailIdx)}</td>` : ''}
+      ${nameH   ? `<td>${buildName(r.rawRow)}</td>` : ''}
+      ${compH   ? `<td class="value-cell">${getCell(r.rawRow, compIdx)}</td>` : ''}
+      ${jobH    ? `<td class="value-cell">${getCell(r.rawRow, jobIdx)}</td>` : ''}
+      <td class="rv-reasons">${r.reasons.map(rr => `<span class="rv-reason">${escapeHtml(rr)}</span>`).join('')}</td>
+    </tr>`).join('');
+
+  const colCount = 2 + [emailH, nameH, compH, jobH].filter(Boolean).length + 1;
+
+  panel.innerHTML = `
+    <div class="section">
+      <div class="rv-header">
+        <h3>Review flagged leads <span class="rv-count" id="rvCount">${reviewRows.length} to remove</span></h3>
+        <div class="rv-bulk">
+          <button class="btn" onclick="setAllReview(true)">Remove all</button>
+          <button class="btn" onclick="setAllReview(false)">Keep all</button>
+        </div>
+      </div>
+      <p class="rv-hint">Each lead is pre-marked for removal. Toggle to <b>Keep</b> any that should stay.</p>
+      <div style="overflow-x:auto">
+        <table class="error-table rv-table">
+          <thead><tr>
+            <th>Action</th><th>Row</th>
+            ${emailH ? '<th>Email</th>' : ''}
+            ${nameH  ? '<th>Name</th>'  : ''}
+            ${compH  ? '<th>Company</th>' : ''}
+            ${jobH   ? '<th>Job Title</th>' : ''}
+            <th>Reason(s)</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="dl-group" style="margin-top:1.25rem">
+        <div class="dl-row">
+          <div class="dl-filename-wrap">
+            <span class="dl-label">Rejected leads</span>
+            <span class="dl-filename-preview" id="previewRejectedLeads">${baseFilename}_rejected.csv</span>
+          </div>
+          <button class="btn primary" id="dlRejBtn"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Download confirmed removals</button>
+        </div>
+      </div>
+    </div>`;
+  panel.style.display = 'block';
+
+  // Wire download button with reviewed rows
+  document.getElementById('dlRejBtn').onclick = (e) => {
+    const toRemove = (window._reviewRows || []).filter(r => r.action === 'remove');
+    if (toRemove.length === 0) {
+      alert('No leads marked for removal. Toggle at least one lead to "Remove" before downloading.');
+      return;
+    }
+    // Build a Map compatible with downloadRejectionTemplate
+    const filteredMap = new Map();
+    toRemove.forEach(r => filteredMap.set(r.rowNum, { rawRow: r.rawRow, reasons: r.reasons }));
+    downloadRejectionTemplate(headers, filteredMap, e.currentTarget);
+  };
+}
+
+function updateReviewRow(idx, checked) {
+  const rows = window._reviewRows;
+  if (!rows || !rows[idx]) return;
+  rows[idx].action = checked ? 'remove' : 'keep';
+
+  const tr = document.getElementById('rv-row-' + idx);
+  if (tr) {
+    tr.className = 'rv-row ' + (checked ? 'rv-remove' : 'rv-keep');
+    const pillRemove = tr.querySelector('.rv-pill-remove');
+    const pillKeep   = tr.querySelector('.rv-pill-keep');
+    if (pillRemove) pillRemove.style.display = checked ? '' : 'none';
+    if (pillKeep)   pillKeep.style.display   = checked ? 'none' : '';
+  }
+
+  const removeCount = rows.filter(r => r.action === 'remove').length;
+  const countEl = document.getElementById('rvCount');
+  if (countEl) countEl.textContent = removeCount + ' to remove';
+}
+
+function setAllReview(remove) {
+  const rows = window._reviewRows || [];
+  rows.forEach((_, i) => {
+    const chk = document.querySelector(`.rv-chk[data-idx="${i}"]`);
+    if (chk) { chk.checked = remove; updateReviewRow(i, remove); }
+  });
 }
 
 function escapeHtml(str) {
