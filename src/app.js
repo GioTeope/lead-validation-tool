@@ -58,6 +58,7 @@ function resetTool() {
   _leadFileBaseName = '';
   _dashFileBaseName = '';
   window._reviewRows = [];
+  window._lastEmailColIdx = -1;
   ['previewErrorReport'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.textContent = '';
@@ -495,14 +496,14 @@ function handleFile(file) {
       }
       result.sheetName = sheetName;
 
-      // Build rejected email set for Step 2
+      // Build rejected email set for Step 2 (raw — filtered by review decisions in handleDashboardFile)
       _rejectedEmailSet = new Set();
+      window._lastEmailColIdx = result.headers.findIndex(h =>
+        RULES.COLUMN_ALIASES.email.some(a => a.toLowerCase() === h.toLowerCase())
+      );
       result.rejectedRows.forEach(({ rawRow }) => {
-        const emailIdx = result.headers.findIndex(h =>
-          RULES.COLUMN_ALIASES.email.some(a => a.toLowerCase() === h.toLowerCase())
-        );
-        if (emailIdx > -1 && rawRow[emailIdx]) {
-          _rejectedEmailSet.add(rawRow[emailIdx].toString().trim().toLowerCase());
+        if (window._lastEmailColIdx > -1 && rawRow[window._lastEmailColIdx]) {
+          _rejectedEmailSet.add(rawRow[window._lastEmailColIdx].toString().trim().toLowerCase());
         }
       });
 
@@ -539,10 +540,31 @@ function handleDashboardFile(file) {
   document.getElementById('step2Actions').style.display = 'none';
   setStep2Status(`<i class="ti ti-loader"></i> Reading <b>${escapeHtml(file.name)}</b>...`, 'info');
 
-  // Guard: Step 1 must have been run first
-  if (_rejectedEmailSet.size === 0) {
-    setStep2Status('No rejected leads found from Step 1. Please validate a lead file first.', 'error');
-    return;
+  // Rebuild the rejected email set from the REVIEWED rows —
+  // only emails the team confirmed for removal should be stripped.
+  // This respects any leads the team toggled to "Keep" in the review panel.
+  const reviewedRows = (window._reviewRows || []).filter(r => r.action === 'remove');
+  if (reviewedRows.length === 0) {
+    // Fall back to raw validator output if review panel wasn't used
+    if (_rejectedEmailSet.size === 0) {
+      setStep2Status('No rejected leads found from Step 1. Please validate a lead file first.', 'error');
+      return;
+    }
+  } else {
+    // Rebuild from reviewed decisions
+    _rejectedEmailSet = new Set();
+    const emailAliases = RULES.COLUMN_ALIASES.email;
+    reviewedRows.forEach(({ rawRow }) => {
+      // We don't have headers here, use the stored header index from the last validation
+      const emailIdx = window._lastEmailColIdx !== undefined ? window._lastEmailColIdx : -1;
+      if (emailIdx > -1 && rawRow[emailIdx]) {
+        _rejectedEmailSet.add(rawRow[emailIdx].toString().trim().toLowerCase());
+      }
+    });
+    if (_rejectedEmailSet.size === 0 && reviewedRows.length > 0) {
+      setStep2Status('Could not find email addresses in the reviewed rows. Make sure the lead file has an Email Address column.', 'error');
+      return;
+    }
   }
 
   const reader = new FileReader();

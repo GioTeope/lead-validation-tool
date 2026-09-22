@@ -123,6 +123,18 @@ function isValidCompany(value) {
     return { ok: false, msg: 'Company name contains a disallowed keyword (e.g. freelance/student/estudiante)' };
   }
 
+  // Word-boundary check for "independent" — flags anywhere in the value,
+  // e.g. "Annotasks / Independent Annotation Projects" or "CPA / Independent".
+  // Skips if immediately followed by a legitimate business noun.
+  const indM = sNorm.match(/\bindependent(?:\s+(\w+))?/);
+  if (indM) {
+    const nextWord = (indM[1] || '').toLowerCase();
+    const businessNouns = /^(insurance|bank|health|school|district|media|studio|publishing|financial|broadcast|film|press|record|radio|tv|television|energy|power|oil|gas|mining|fund|trust|capital|group|corp|inc|llc|ltd|nation|federal|community|mutual|state|county|city|market|store|shop|hospital|clinic|lab|laboratory|college|university|association|foundation)$/;
+    if (!nextWord || !businessNouns.test(nextWord)) {
+      return { ok: false, msg: 'Company name indicates an independent worker rather than a company' };
+    }
+  }
+
   const fuzzyMatch = fuzzyMatchesBlocklist(s);
   if (fuzzyMatch) {
     return { ok: false, msg: `Company name closely resembles a disallowed term — possible typo of "${fuzzyMatch}"` };
@@ -156,6 +168,11 @@ function isValidJobTitle(value) {
   const keywordMatch = RULES.BAD_JOB_TITLE_KEYWORDS.some(kw => sNorm.includes(stripAccents(kw.toLowerCase())));
   if (keywordMatch) {
     return { ok: false, msg: 'Job title contains a disallowed keyword (e.g. student/freelance)' };
+  }
+
+  // Word-boundary check for "independent" anywhere in job title
+  if (/\bindependent\b/i.test(sNorm)) {
+    return { ok: false, msg: 'Job title indicates an independent worker rather than an employee' };
   }
 
   const fuzzyMatch = fuzzyMatchesBlocklist(s);
