@@ -290,8 +290,14 @@ function updateReviewRow(idx, checked) {
   }
 
   const removeCount = rows.filter(r => r.action === 'remove').length;
+
+  // Update review panel counter
   const countEl = document.getElementById('rvCount');
   if (countEl) countEl.textContent = removeCount + ' to remove';
+
+  // Update Step 2 header count live so it always reflects confirmed removals
+  const step2CountEl = document.getElementById('step2Count');
+  if (step2CountEl) step2CountEl.textContent = removeCount;
 }
 
 function setAllReview(remove) {
