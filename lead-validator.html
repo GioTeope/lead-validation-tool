@@ -166,6 +166,20 @@ input[type="file"] { display: none; }
 .rv-reason { display:inline-block; font-size:11px; background:var(--surface-1); border:1px solid var(--border); border-radius:4px; padding:1px 6px; margin:2px 2px 2px 0; }
 .rv-email { max-width:180px; word-break:break-all; }
 .rv-rownum { color:var(--text-muted); }
+
+/* ── Review panel controls ── */
+.rv-controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:.75rem; }
+.rv-search-input { flex:1; min-width:180px; padding:7px 10px; border:1px solid var(--border-strong); border-radius:var(--radius); font-size:13px; font-family:inherit; background:var(--surface-2); color:var(--text-primary); }
+.rv-search-input:focus { outline:none; border-color:var(--accent); }
+.rv-filter-tabs { display:flex; gap:4px; flex-wrap:wrap; }
+.rv-tab { padding:5px 12px; border:1px solid var(--border-strong); border-radius:20px; font-size:12px; cursor:pointer; background:var(--surface-2); color:var(--text-secondary); font-family:inherit; }
+.rv-tab:hover { background:var(--surface-1); }
+.rv-tab-active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.rv-pagination { display:flex; align-items:center; gap:10px; margin-top:.75rem; font-size:13px; }
+.rv-page-btn { padding:5px 12px; font-size:12px; }
+.rv-page-btn:disabled { opacity:.4; cursor:default; }
+.rv-page-info { color:var(--text-muted); font-size:12px; }
+.rv-reason-manual { background:#f0fdf4; color:#16a34a; border-color:#bbf7d0; }
 </style></head><body>
 <div class="wrap">
   <header class="page-header">
@@ -960,7 +974,7 @@ function stripAccents(s) {
 // Keywords to fuzzy-match against — a short focused list of the most
 // commonly mistyped blocklist terms. The full keyword list still runs
 // first as an exact/substring check; fuzzy is a third-layer safety net.
-const FUZZY_BLOCKLIST = ['freelance', 'student', 'self learner', 'estudiante'];
+const FUZZY_BLOCKLIST = ['freelance', 'student', 'self learner', 'estudiante', 'self employed'];
 
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
@@ -977,29 +991,40 @@ function levenshtein(a, b) {
 
 function fuzzyMatchesBlocklist(value) {
   const s = stripAccents(value.toString().toLowerCase().trim());
-  // Split into individual words to avoid matching substrings inside longer words
-  // e.g. "investment" containing "stment" should NOT match "student"
   const words = s.split(/[\s\/\-,]+/).filter(Boolean);
+  // Also produce a no-separator version for catching run-together typos
+  // like "selfemployeed" matching "self employed"
+  const sNoSep = s.replace(/[\s\-_\/]+/g, '');
 
   for (const kw of FUZZY_BLOCKLIST) {
     const threshold = kw.length <= 6 ? 1 : 2;
     const kwWords = kw.split(/\s+/);
+    const kwNoSep = kw.replace(/\s+/g, '');
 
     // Single-word keyword: check each word in the value individually
     if (kwWords.length === 1) {
       for (const word of words) {
-        // Only compare words of similar length to avoid "stment" matching "student"
-        // Length must be within (threshold) characters of the keyword
         if (Math.abs(word.length - kw.length) <= threshold) {
           if (levenshtein(word, kw) <= threshold) return kw;
         }
       }
     } else {
-      // Multi-word keyword (e.g. "self learner"): check consecutive word pairs
+      // Multi-word keyword: check consecutive word groups
       for (let i = 0; i <= words.length - kwWords.length; i++) {
         const phrase = words.slice(i, i + kwWords.length).join(' ');
         if (Math.abs(phrase.length - kw.length) <= threshold * kwWords.length) {
           if (levenshtein(phrase, kw) <= threshold * kwWords.length) return kw;
+        }
+      }
+      // Also check no-separator form vs the value as a whole word
+      // catches "selfemployeed" (no space) matching "self employed"
+      if (Math.abs(sNoSep.length - kwNoSep.length) <= threshold) {
+        if (levenshtein(sNoSep, kwNoSep) <= threshold) return kw;
+      }
+      // And check each individual word of the value against the no-sep keyword
+      for (const word of words) {
+        if (Math.abs(word.length - kwNoSep.length) <= threshold) {
+          if (levenshtein(word, kwNoSep) <= threshold) return kw;
         }
       }
     }
@@ -1021,15 +1046,32 @@ function isValidCompany(value) {
   }
 
   const sNorm = stripAccents(s.toLowerCase());
+  // Normalize separators: hyphens/underscores → space, then also produce
+  // a no-separator version so "no-company", "no_company", "nocompany" all
+  // match the same keyword as "no company" / "self employed"
+  const sNormSpaced  = sNorm.replace(/[-_\/]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const sNormNoSep   = sNorm.replace(/[-_\/\s]+/g, '');
 
-  const exactMatch = RULES.SCRUBBED_COMPANIES.some(c => stripAccents(c.toLowerCase()) === sNorm);
+  function matchesVariant(candidate) {
+    const cn        = stripAccents(candidate.toLowerCase());
+    const cnSpaced  = cn.replace(/[-_\/]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const cnNoSep   = cn.replace(/[-_\/\s]+/g, '');
+    return cn === sNorm || cnSpaced === sNormSpaced || cnNoSep === sNormNoSep;
+  }
+  function containsVariant(keyword) {
+    const kn       = stripAccents(keyword.toLowerCase());
+    const knNoSep  = kn.replace(/[-_\/\s]+/g, '');
+    return sNorm.includes(kn) || sNormSpaced.includes(kn.replace(/[-_\/]+/g,' ').trim()) || sNormNoSep.includes(knNoSep);
+  }
+
+  const exactMatch = RULES.SCRUBBED_COMPANIES.some(c => matchesVariant(c));
   if (exactMatch) {
     return { ok: false, msg: 'Invalid company name value' };
   }
 
-  const keywordMatch = RULES.SCRUBBED_COMPANY_KEYWORDS.some(kw => sNorm.includes(stripAccents(kw.toLowerCase())));
+  const keywordMatch = RULES.SCRUBBED_COMPANY_KEYWORDS.some(kw => containsVariant(kw));
   if (keywordMatch) {
-    return { ok: false, msg: 'Company name contains a disallowed keyword (e.g. freelance/student/estudiante)' };
+    return { ok: false, msg: 'Company name contains a disallowed keyword (e.g. freelance/student/self-employed)' };
   }
 
   // Word-boundary check for "independent" — flags anywhere in the value,
@@ -1225,6 +1267,7 @@ function validateLeadData(data, compliance) {
 
   const errors = [];
   const rejectedRows = new Map();
+  const allRows = [];          // every data row (for full review table)
   const programStatusCounts = {};
   let checked = 0;
 
@@ -1233,6 +1276,7 @@ function validateLeadData(data, compliance) {
     const hasData = row.some(c => c !== null && c !== undefined && c.toString().trim() !== '');
     if (!hasData) return;
     checked++;
+    allRows.push({ rowNum, rawRow: row });
 
     if (colIdx.programStatus > -1) {
       const val = (row[colIdx.programStatus] || '').toString().trim() || '(blank)';
@@ -1283,7 +1327,7 @@ function validateLeadData(data, compliance) {
     }
   });
 
-  return { checked, errors, headers, rejectedRows, programStatusCounts, compliance, emptyFile: false };
+  return { checked, errors, headers, rejectedRows, allRows, programStatusCounts, compliance, emptyFile: false };
 }
 
 
@@ -1442,7 +1486,7 @@ function renderResults({ checked, errors, headers, rejectedRows, programStatusCo
   if (prev) prev.textContent = base + '_errors.csv';
 
   // Build review panel for rejected leads
-  renderReviewPanel(headers, rejectedRows, base);
+  renderReviewPanel(headers, rejectedRows, base, result.allRows || []);
 
   // Reveal Step 2 if there are rejected leads to clean up
   if (rejectedRows.size > 0) {
@@ -1455,70 +1499,72 @@ function renderResults({ checked, errors, headers, rejectedRows, programStatusCo
 // Shows each flagged lead with a Keep / Remove toggle so the team can
 // review before downloading the rejected leads file.
 
-function renderReviewPanel(headers, rejectedRows, baseFilename) {
+// ── Review panel state ────────────────────────────────────────────────────────
+const RV_PAGE_SIZE = 50;
+let _rvPage = 0;
+let _rvFilter = 'all';   // 'all' | 'flagged' | 'remove' | 'keep'
+let _rvSearch = '';
+let _rvHeaders = [];
+let _rvEmailIdx = -1;
+let _rvFirstIdx = -1;
+let _rvLastIdx  = -1;
+let _rvCompIdx  = -1;
+let _rvJobIdx   = -1;
+
+function renderReviewPanel(headers, rejectedRows, baseFilename, allRows) {
   const panel = document.getElementById('reviewPanel');
   if (!panel) return;
 
-  if (rejectedRows.size === 0) {
-    panel.style.display = 'none';
-    return;
-  }
+  _rvHeaders  = headers;
+  _rvEmailIdx = headers.findIndex(h => RULES.COLUMN_ALIASES.email.some(a => a.toLowerCase() === h.toLowerCase()));
+  _rvFirstIdx = headers.findIndex(h => RULES.COLUMN_ALIASES.firstName.some(a => a.toLowerCase() === h.toLowerCase()));
+  _rvLastIdx  = headers.findIndex(h => RULES.COLUMN_ALIASES.lastName.some(a => a.toLowerCase() === h.toLowerCase()));
+  _rvCompIdx  = headers.findIndex(h => RULES.COLUMN_ALIASES.company.some(a => a.toLowerCase() === h.toLowerCase()));
+  _rvJobIdx   = headers.findIndex(h => RULES.COLUMN_ALIASES.jobTitle.some(a => a.toLowerCase() === h.toLowerCase()));
 
-  // Find key column indices for the review preview
-  const emailIdx  = headers.findIndex(h => RULES.COLUMN_ALIASES.email.some(a => a.toLowerCase() === h.toLowerCase()));
-  const firstIdx  = headers.findIndex(h => RULES.COLUMN_ALIASES.firstName.some(a => a.toLowerCase() === h.toLowerCase()));
-  const lastIdx   = headers.findIndex(h => RULES.COLUMN_ALIASES.lastName.some(a => a.toLowerCase() === h.toLowerCase()));
-  const compIdx   = headers.findIndex(h => RULES.COLUMN_ALIASES.company.some(a => a.toLowerCase() === h.toLowerCase()));
-  const jobIdx    = headers.findIndex(h => RULES.COLUMN_ALIASES.jobTitle.some(a => a.toLowerCase() === h.toLowerCase()));
-
-  // Build review rows — each starts as 'remove' (pre-ticked)
-  const reviewRows = [];
-  rejectedRows.forEach(({ rawRow, reasons }, rowNum) => {
-    reviewRows.push({ rowNum, rawRow, reasons, action: 'remove' });
+  // Build all review rows — flagged start as 'remove', clean start as 'keep'
+  const reviewRows = (allRows || []).map(({ rowNum, rawRow }) => {
+    const flagged = rejectedRows.has(rowNum);
+    return {
+      rowNum,
+      rawRow,
+      reasons: flagged ? rejectedRows.get(rowNum).reasons : [],
+      flagged,
+      action: flagged ? 'remove' : 'keep'
+    };
   });
-  window._reviewRows = reviewRows; // store for download use
+  window._reviewRows = reviewRows;
+  _rvPage = 0;
+  _rvFilter = 'all';
+  _rvSearch = '';
 
-  const emailH  = emailIdx  > -1 ? 'Email' : '';
-  const nameH   = (firstIdx > -1 || lastIdx > -1) ? 'Name' : '';
-  const compH   = compIdx   > -1 ? 'Company' : '';
-  const jobH    = jobIdx    > -1 ? 'Job Title' : '';
-
-  function getCell(row, idx) { return idx > -1 ? escapeHtml((row[idx] || '').toString().trim()) : ''; }
-  function buildName(row) {
-    const f = firstIdx > -1 ? (row[firstIdx] || '') : '';
-    const l = lastIdx  > -1 ? (row[lastIdx]  || '') : '';
-    return escapeHtml((f + ' ' + l).trim());
-  }
-
-  const rows = reviewRows.map((r, i) => `
-    <tr id="rv-row-${i}" class="rv-row rv-remove">
-      <td class="rv-cell-check">
-        <label class="rv-toggle">
-          <input type="checkbox" class="rv-chk" data-idx="${i}" checked onchange="updateReviewRow(${i}, this.checked)">
-          <span class="rv-pill rv-pill-remove">Remove</span>
-          <span class="rv-pill rv-pill-keep" style="display:none">Keep</span>
-        </label>
-      </td>
-      <td class="muted rv-rownum">${r.rowNum}</td>
-      ${emailH  ? `<td class="rv-email value-cell">${getCell(r.rawRow, emailIdx)}</td>` : ''}
-      ${nameH   ? `<td>${buildName(r.rawRow)}</td>` : ''}
-      ${compH   ? `<td class="value-cell">${getCell(r.rawRow, compIdx)}</td>` : ''}
-      ${jobH    ? `<td class="value-cell">${getCell(r.rawRow, jobIdx)}</td>` : ''}
-      <td class="rv-reasons">${r.reasons.map(rr => `<span class="rv-reason">${escapeHtml(rr)}</span>`).join('')}</td>
-    </tr>`).join('');
-
-  const colCount = 2 + [emailH, nameH, compH, jobH].filter(Boolean).length + 1;
+  const emailH = _rvEmailIdx > -1;
+  const nameH  = _rvFirstIdx > -1 || _rvLastIdx > -1;
+  const compH  = _rvCompIdx  > -1;
+  const jobH   = _rvJobIdx   > -1;
 
   panel.innerHTML = `
     <div class="section">
       <div class="rv-header">
-        <h3>Review flagged leads <span class="rv-count" id="rvCount">${reviewRows.length} to remove</span></h3>
+        <h3>Review all leads <span class="rv-count" id="rvCount">${rejectedRows.size} to remove</span></h3>
         <div class="rv-bulk">
-          <button class="btn" onclick="setAllReview(true)">Remove all</button>
+          <button class="btn" onclick="setAllReview(true, true)">Remove all flagged</button>
+          <button class="btn" onclick="setAllReview(true, false)">Remove ALL</button>
           <button class="btn" onclick="setAllReview(false)">Keep all</button>
         </div>
       </div>
-      <p class="rv-hint">Each lead is pre-marked for removal. Toggle to <b>Keep</b> any that should stay.</p>
+      <p class="rv-hint">Flagged leads are pre-marked <b>Remove</b>. Clean leads are pre-marked <b>Keep</b>. Toggle any row to override.</p>
+
+      <div class="rv-controls">
+        <input type="text" id="rvSearch" class="rv-search-input" placeholder="Search email, name, company…" oninput="rvSearchChanged(this.value)">
+        <div class="rv-filter-tabs">
+          <button class="rv-tab rv-tab-active" data-filter="all" onclick="rvFilterChanged('all')">All (<span id="cnt-all">${reviewRows.length}</span>)</button>
+          <button class="rv-tab" data-filter="flagged" onclick="rvFilterChanged('flagged')">Flagged (<span id="cnt-flagged">${rejectedRows.size}</span>)</button>
+          <button class="rv-tab" data-filter="remove" onclick="rvFilterChanged('remove')">To Remove (<span id="cnt-remove">${rejectedRows.size}</span>)</button>
+          <button class="rv-tab" data-filter="keep" onclick="rvFilterChanged('keep')">To Keep (<span id="cnt-keep">${reviewRows.length - rejectedRows.size}</span>)</button>
+        </div>
+      </div>
+
       <div style="overflow-x:auto">
         <table class="error-table rv-table">
           <thead><tr>
@@ -1529,9 +1575,11 @@ function renderReviewPanel(headers, rejectedRows, baseFilename) {
             ${jobH   ? '<th>Job Title</th>' : ''}
             <th>Reason(s)</th>
           </tr></thead>
-          <tbody>${rows}</tbody>
+          <tbody id="rvBody"></tbody>
         </table>
       </div>
+      <div class="rv-pagination" id="rvPagination"></div>
+
       <div class="dl-group" style="margin-top:1.25rem">
         <div class="dl-row">
           <div class="dl-filename-wrap">
@@ -1544,51 +1592,137 @@ function renderReviewPanel(headers, rejectedRows, baseFilename) {
     </div>`;
   panel.style.display = 'block';
 
-  // Wire download button with reviewed rows
+  rvRenderPage();
+
   document.getElementById('dlRejBtn').onclick = (e) => {
     const toRemove = (window._reviewRows || []).filter(r => r.action === 'remove');
     if (toRemove.length === 0) {
-      alert('No leads marked for removal. Toggle at least one lead to "Remove" before downloading.');
+      alert('No leads marked for removal.');
       return;
     }
-    // Build a Map compatible with downloadRejectionTemplate
     const filteredMap = new Map();
     toRemove.forEach(r => filteredMap.set(r.rowNum, { rawRow: r.rawRow, reasons: r.reasons }));
-    downloadRejectionTemplate(headers, filteredMap, e.currentTarget);
+    downloadRejectionTemplate(_rvHeaders, filteredMap, e.currentTarget);
   };
+}
+
+function rvGetFiltered() {
+  const rows = window._reviewRows || [];
+  const q = _rvSearch.toLowerCase().trim();
+  return rows.filter(r => {
+    if (_rvFilter === 'flagged' && !r.flagged) return false;
+    if (_rvFilter === 'remove'  && r.action !== 'remove') return false;
+    if (_rvFilter === 'keep'    && r.action !== 'keep') return false;
+    if (q) {
+      const email   = _rvEmailIdx > -1 ? (r.rawRow[_rvEmailIdx] || '') : '';
+      const first   = _rvFirstIdx > -1 ? (r.rawRow[_rvFirstIdx] || '') : '';
+      const last    = _rvLastIdx  > -1 ? (r.rawRow[_rvLastIdx]  || '') : '';
+      const company = _rvCompIdx  > -1 ? (r.rawRow[_rvCompIdx]  || '') : '';
+      const job     = _rvJobIdx   > -1 ? (r.rawRow[_rvJobIdx]   || '') : '';
+      const haystack = [email, first, last, company, job].join(' ').toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function rvRenderPage() {
+  const filtered = rvGetFiltered();
+  const totalPages = Math.max(1, Math.ceil(filtered.length / RV_PAGE_SIZE));
+  if (_rvPage >= totalPages) _rvPage = totalPages - 1;
+  const pageRows = filtered.slice(_rvPage * RV_PAGE_SIZE, (_rvPage + 1) * RV_PAGE_SIZE);
+
+  const emailH = _rvEmailIdx > -1;
+  const nameH  = _rvFirstIdx > -1 || _rvLastIdx > -1;
+  const compH  = _rvCompIdx  > -1;
+  const jobH   = _rvJobIdx   > -1;
+
+  function getCell(row, idx) { return idx > -1 ? escapeHtml((row[idx] || '').toString().trim()) : ''; }
+  function buildName(row) {
+    const f = _rvFirstIdx > -1 ? (row[_rvFirstIdx] || '') : '';
+    const l = _rvLastIdx  > -1 ? (row[_rvLastIdx]  || '') : '';
+    return escapeHtml((f + ' ' + l).trim());
+  }
+
+  const tbody = document.getElementById('rvBody');
+  if (!tbody) return;
+
+  if (pageRows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No leads match the current filter.</td></tr>`;
+  } else {
+    tbody.innerHTML = pageRows.map(r => {
+      const globalIdx = (window._reviewRows || []).indexOf(r);
+      const isRemove = r.action === 'remove';
+      return `<tr id="rv-row-${globalIdx}" class="rv-row ${isRemove ? 'rv-remove' : 'rv-keep'}">
+        <td class="rv-cell-check">
+          <label class="rv-toggle">
+            <input type="checkbox" class="rv-chk" data-idx="${globalIdx}" ${isRemove ? 'checked' : ''} onchange="updateReviewRow(${globalIdx}, this.checked)">
+            <span class="rv-pill rv-pill-remove" ${isRemove ? '' : 'style="display:none"'}>Remove</span>
+            <span class="rv-pill rv-pill-keep"   ${isRemove ? 'style="display:none"' : ''}>Keep</span>
+          </label>
+        </td>
+        <td class="muted rv-rownum">${r.rowNum}</td>
+        ${emailH ? `<td class="rv-email value-cell">${getCell(r.rawRow, _rvEmailIdx)}</td>` : ''}
+        ${nameH  ? `<td>${buildName(r.rawRow)}</td>` : ''}
+        ${compH  ? `<td class="value-cell">${getCell(r.rawRow, _rvCompIdx)}</td>` : ''}
+        ${jobH   ? `<td class="value-cell">${getCell(r.rawRow, _rvJobIdx)}</td>` : ''}
+        <td class="rv-reasons">${r.flagged
+          ? r.reasons.map(rr => `<span class="rv-reason">${escapeHtml(rr)}</span>`).join('')
+          : '<span class="rv-reason rv-reason-manual">Manual selection</span>'
+        }</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Pagination
+  const pag = document.getElementById('rvPagination');
+  if (pag) {
+    if (totalPages <= 1) {
+      pag.innerHTML = `<span class="rv-page-info">Showing ${filtered.length} of ${(window._reviewRows||[]).length} leads</span>`;
+    } else {
+      pag.innerHTML = `
+        <button class="btn rv-page-btn" onclick="rvGoPage(${_rvPage - 1})" ${_rvPage === 0 ? 'disabled' : ''}>← Prev</button>
+        <span class="rv-page-info">Page ${_rvPage + 1} of ${totalPages} &nbsp;·&nbsp; ${filtered.length} leads</span>
+        <button class="btn rv-page-btn" onclick="rvGoPage(${_rvPage + 1})" ${_rvPage >= totalPages - 1 ? 'disabled' : ''}>Next →</button>`;
+    }
+  }
+
+  // Update filter tab counts
+  const all = window._reviewRows || [];
+  const flaggedCount = all.filter(r => r.flagged).length;
+  const removeCount  = all.filter(r => r.action === 'remove').length;
+  const keepCount    = all.filter(r => r.action === 'keep').length;
+  const cntAll = document.getElementById('cnt-all');     if (cntAll) cntAll.textContent = all.length;
+  const cntFlag = document.getElementById('cnt-flagged'); if (cntFlag) cntFlag.textContent = flaggedCount;
+  const cntRem = document.getElementById('cnt-remove');  if (cntRem) cntRem.textContent = removeCount;
+  const cntKeep = document.getElementById('cnt-keep');   if (cntKeep) cntKeep.textContent = keepCount;
+  const rvCnt = document.getElementById('rvCount');      if (rvCnt) rvCnt.textContent = removeCount + ' to remove';
+  const s2Cnt = document.getElementById('step2Count');   if (s2Cnt) s2Cnt.textContent = removeCount;
+}
+
+function rvGoPage(p) { _rvPage = p; rvRenderPage(); }
+function rvSearchChanged(q) { _rvSearch = q; _rvPage = 0; rvRenderPage(); }
+function rvFilterChanged(f) {
+  _rvFilter = f;
+  _rvPage = 0;
+  document.querySelectorAll('.rv-tab').forEach(t => t.className = 'rv-tab' + (t.dataset.filter === f ? ' rv-tab-active' : ''));
+  rvRenderPage();
 }
 
 function updateReviewRow(idx, checked) {
   const rows = window._reviewRows;
   if (!rows || !rows[idx]) return;
   rows[idx].action = checked ? 'remove' : 'keep';
-
-  const tr = document.getElementById('rv-row-' + idx);
-  if (tr) {
-    tr.className = 'rv-row ' + (checked ? 'rv-remove' : 'rv-keep');
-    const pillRemove = tr.querySelector('.rv-pill-remove');
-    const pillKeep   = tr.querySelector('.rv-pill-keep');
-    if (pillRemove) pillRemove.style.display = checked ? '' : 'none';
-    if (pillKeep)   pillKeep.style.display   = checked ? 'none' : '';
-  }
-
-  const removeCount = rows.filter(r => r.action === 'remove').length;
-
-  // Update review panel counter
-  const countEl = document.getElementById('rvCount');
-  if (countEl) countEl.textContent = removeCount + ' to remove';
-
-  // Update Step 2 header count live so it always reflects confirmed removals
-  const step2CountEl = document.getElementById('step2Count');
-  if (step2CountEl) step2CountEl.textContent = removeCount;
+  rvRenderPage(); // re-render current page to reflect change
 }
 
-function setAllReview(remove) {
+function setAllReview(remove, flaggedOnly = false) {
   const rows = window._reviewRows || [];
-  rows.forEach((_, i) => {
-    const chk = document.querySelector(`.rv-chk[data-idx="${i}"]`);
-    if (chk) { chk.checked = remove; updateReviewRow(i, remove); }
+  rows.forEach(r => {
+    if (flaggedOnly && !r.flagged) return;
+    r.action = remove ? 'remove' : 'keep';
   });
+  rvRenderPage();
 }
 
 function escapeHtml(str) {
