@@ -1377,6 +1377,8 @@ function resetTool() {
   document.getElementById('statusBar').style.display = 'none';
   document.getElementById('fileIn').value = '';
   document.getElementById('dropZone').style.display = '';
+  const sn = document.getElementById('sheetNote');
+  if (sn) sn.innerHTML = '';
   document.getElementById('programStatusBreakdown').style.display = 'none';
   const ca = document.getElementById('complianceAudit');
   if (ca) ca.style.display = 'none';
@@ -1933,8 +1935,30 @@ function handleFile(file) {
       renderResults(result);
     } catch (err) {
       console.error(err);
-      setStatus('Could not read file. Make sure it is a valid .xlsx or .csv.', 'error');
+      // Clear any stale sheet note from a previous run so it doesn't
+      // appear alongside the error message
+      const sn = document.getElementById('sheetNote');
+      if (sn) sn.innerHTML = '';
+
+      // Give a more specific error message based on what went wrong
+      let msg = 'Could not read file.';
+      if (err && err.message) {
+        if (/password|encrypted/i.test(err.message)) {
+          msg = 'This file is password-protected. Please remove the password and try again.';
+        } else if (/cfb|signature|magic/i.test(err.message)) {
+          msg = 'File appears to be corrupted or is not a valid Excel file. Try re-exporting from MaSH.';
+        } else if (/zip|inflate/i.test(err.message)) {
+          msg = 'File could not be unzipped. It may be corrupted. Try re-exporting from MaSH.';
+        } else {
+          msg = `Could not parse file: ${err.message}. Try re-exporting from MaSH as .xlsx.`;
+        }
+      }
+      setStatus(msg, 'error');
     }
+  };
+
+  reader.onerror = () => {
+    setStatus('Failed to read the file — it may be locked or in use by another program.', 'error');
   };
 
   if (ext === 'csv') reader.readAsText(file);
